@@ -1,0 +1,1024 @@
+---
+title: "Missing protein analysis"
+output: html_document
+---
+
+# FDR distribution
+```{r echo=TRUE, warning=FALSE}
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first 
+df_missing <- read_xlsx("./Data/missingprotein_FPR.xlsx")
+df_missing$protein.falsePositiveRate = df_missing$protein.falsePositiveRate
+df_nonmissing <- read.csv("./Data/FPR_nonmissing.csv")
+df_nonmissing_distr <- sample(df_nonmissing$protein.falsePositiveRate,60000)
+
+
+## density plot
+
+P1 <- density(df_missing$protein.falsePositiveRate)
+P2 <- density(df_nonmissing_distr)
+
+
+xlim <- range(P1$x,P2$x)
+ylim <- range(0,P1$y,P2$y)
+
+plot(P2, xlim = c(0,2), ylim = ylim, xlab = 'FPR %',
+     main = 'Distribution of FPR', 
+     panel.first = grid())
+polygon(P1, density = -1, col = scales::alpha('orange',0.6))
+polygon(P2, density = -1, col = scales::alpha('orchid',0.4))
+
+# polygon(P3, density = -1, col = scales::alpha('turquoise1',0.5))
+
+legend('top',c('Missing proteins','Regular proteins'),
+       fill = c(scales::alpha('orange',0.5), scales::alpha('orchid',0.5),col = scales::alpha('turquoise1',0.5)), bty = 'n',
+       border = NA, cex = 1.2)
+```
+
+
+# TCE Heatmap
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+# library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+# setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("data/CellLineCompartment_TCE_SumTickNormalization.tsv",sep = "\t", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("data/CellLineCompartment_TCE_SumTickNormalization.tsv",sep = "\t", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+
+col_annotation$X2 <- as.character(col_annotation$X1)
+col_annotation$X2[grep("Breast",col_annotation$X1)] = ("Breast")
+col_annotation$X2[grep("Leukemia",col_annotation$X1)] = ("Leukemia")
+col_annotation <- data.frame(col_annotation[,-c(1)])
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Simplified Cancer type")
+
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+# pheatmap(df_missing_normalized_matrix,
+#          #fontsize_col = 5, 
+#          #fontsize_row = 4,
+#          show_rownames = F,
+#          show_colnames = F,
+#          main = "Total Cell Extract", 
+#          cluster_cols = F,
+#          cluster_rows = F,
+#          annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+
+# only leave those spread apart? 
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sd(c)>0.1),]
+
+# at least two condtions have non-missing values
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix_frequestnidentified[apply(df_missing_normalized_matrix_frequestnidentified, 1, function(c) sum(c!=0)>1), ]
+
+
+
+
+# mat_colors <- list(group = brewer.pal(sum(!duplicated(col_annotation$`Simplifeid Cancer type`)), "Set3"))
+
+nb.cols <- sum(!duplicated(col_annotation$`Simplifeid Cancer type`))
+Var1 <- colorRampPalette(brewer.pal(8, "Pastel1"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Simplifeid Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+
+quantile_breaks <- function(xs, n = 10) {
+  breaks <- quantile(xs, probs = seq(0, 1, length.out = n))
+  breaks[!duplicated(breaks)]
+}
+
+mat_breaks <- quantile_breaks(df_missing_normalized_matrix_frequestnidentified, n = 200)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 3,
+         # cutree_rows = 6,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         # color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(mat_breaks)),
+         # breaks = mat_breaks,
+         show_rownames = T,
+         show_colnames = F,
+         main = "Total Cell Extract", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_colors = anno_colors,
+         annotation_col = col_annotation
+         )
+
+write.csv(df_missing_normalized_matrix_frequestnidentified, "output/TCE_abundant_missingpteinst.csv")
+```
+
+
+
+# Surface Heatmap
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/CellLineCompartment_Surface_SumTickNormalization.csv",sep = "\t", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/CellLineCompartment_Surface_SumTickNormalization.csv",sep = "\t", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Cancer type")
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "Surface", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0)>4),]
+
+mat_colors <- list(group = brewer.pal(9, "Set1"))
+
+nb.cols <- 17
+Var1 <- colorRampPalette(brewer.pal(8, "Reds"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 6,
+         # cutree_cols = 17,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "Surface", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_col = col_annotation)
+         # annotation_colors = anno_colors)
+
+
+```
+
+
+
+# Media Heatmap
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/CellLineCompartment_Media_SumTickNormalization.csv", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/CellLineCompartment_Media_SumTickNormalization.csv", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Cancer type")
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "Media", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0)>4),]
+
+mat_colors <- list(group = brewer.pal(9, "Set1"))
+
+nb.cols <- 17
+Var1 <- colorRampPalette(brewer.pal(8, "Reds"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 6,
+         # cutree_cols = 17,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "Media", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_col = col_annotation)
+         # annotation_colors = anno_colors)
+
+
+```
+
+
+
+# Nuclear Heatmap
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/CellLineCompartment_Nuclear_SumTickNormalization.csv",sep = "\t", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/CellLineCompartment_Nuclear_SumTickNormalization.csv",sep = "\t", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Cancer type")
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "Nucleas", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0)>4),]
+
+mat_colors <- list(group = brewer.pal(9, "Set1"))
+
+nb.cols <- 17
+Var1 <- colorRampPalette(brewer.pal(8, "Reds"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 6,
+         # cutree_cols = 17,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "Nucleas", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_col = col_annotation)
+         # annotation_colors = anno_colors)
+
+
+```
+
+
+
+
+# Exosome Heatmap
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/CellLineCompartment_Exosome_SumTickNormalization.csv", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/CellLineCompartment_Exosome_SumTickNormalization.csv", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Cancer type")
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "Exosome", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0)>4),]
+
+mat_colors <- list(group = brewer.pal(9, "Set1"))
+
+nb.cols <- 17
+Var1 <- colorRampPalette(brewer.pal(8, "Reds"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 6,
+         # cutree_cols = 17,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "Exosome", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_col = col_annotation)
+         # annotation_colors = anno_colors)
+
+
+```
+
+
+
+## MHC Heatmap
+
+```{r echo=TRUE, warning=FALSE}
+
+## let read the required libraries
+rm(list = ls())
+
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/MHC_SumTickNormalization.csv", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/MHC_SumTickNormalization.csv", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Cancer type")
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+# ### z score normaliztion instead
+# df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+# df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+# df_missing_normalized_matrix <- apply(df_missing_normalized_matrix, 2, scale)
+
+### heatmap
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "MHC", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = col_annotation)
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0)>1),]
+
+mat_colors <- list(group = brewer.pal(9, "Set1"))
+
+nb.cols <- 17
+Var1 <- colorRampPalette(brewer.pal(8, "Reds"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 6,
+         # cutree_cols = 17,
+         color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "MHC", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_col = col_annotation,
+         annotation_colors = anno_colors)
+
+
+```
+
+
+### Distribution of Samples detected
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Acc_Coverage")
+
+df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)`[df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)` >= 50] = 50
+hist(df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)`, col = "red", breaks = 100, xlab = "Number of Samples", ylab = "Frequency", xlim = c(0,50))
+```
+
+
+### Distribution of PSM
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Table1_data")
+
+df_missing$TotalPep[df_missing$TotalPep >= 100] = 100
+hist(df_missing$TotalPep, col = "blue", breaks = 100, xlab = "Peptide Spectra Matching", ylab = "Frequency", xlim = c(0,100))
+
+```
+
+
+### Venny diagram
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## read the data first
+df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Table1_data")
+df_missing_plasma <- read_xlsx("./Data/From Jen_UniquePeptides/UniquePeptides.xlsx")
+
+
+# Load library
+library(VennDiagram)
+ 
+# venn diagram
+
+set1 <- df_missing_plasma$Accession
+set2 <- df_missing$Accession[with(df_missing, ExperimentType == "CELLLINE(EXOSOME)")]
+set3 <- df_missing$Accession[with(df_missing, ExperimentType == "CELLLINE" | ExperimentType == "PRIMARY CELL")]
+
+myCol <- brewer.pal(3, "Pastel2")
+
+# Chart
+venn.diagram(
+        x = list(set1, set2, set3),
+        category.names = c("Human Plasma" , "Exosome " , "Cancer cell"),
+        filename = '#14_venn_diagramm.png',
+        output=TRUE,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 480 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .5,
+        fontface = "bold",
+        fontfamily = "sans",
+        
+        # Set names
+        cat.cex = 0.01,
+        cat.fontface = "bold",
+        cat.default.pos = "outer",
+        cat.pos = c(-27, 27, 135),
+        cat.dist = c(0.055, 0.055, 0.085),
+        cat.fontfamily = "sans",
+        rotation = 2
+)
+
+
+### what about cell line compartment
+set3 <- df_missing$Accession[with(df_missing, (ExperimentType == "CELLLINE" & Compartment == "TCE"))]
+set4 <- df_missing$Accession[with(df_missing, (ExperimentType == "CELLLINE" & Compartment == "Surface"))]
+set5 <- df_missing$Accession[with(df_missing, (ExperimentType == "CELLLINE" & Compartment == "Media"))]
+set6 <- df_missing$Accession[with(df_missing, (ExperimentType == "CELLLINE" & Compartment == "Nuclear"))]
+
+
+myCol <- brewer.pal(4, "Pastel2")
+
+# Chart
+venn.diagram(
+        x = list(set3, set4, set5, set6),
+        category.names = c("TCE" , "Surface " , "Media", "Nuclear"),
+        filename = '#15_venn_diagramm.png',
+        output=TRUE,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 600 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .6,
+        fontface = "bold",
+        fontfamily = "sans",
+        
+                # Set names
+        cat.cex = 0.5,
+        cat.fontface = "bold",
+        cat.default.pos = "outer",
+)
+
+
+```
+
+
+### Here, let's focus on correlation between RNA Seq data and proteomic dataset.
+
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+df_RNA <- read.csv("./Data/Gastric/From Candy/merged_IPAS_RNAseq_counts.csv")
+df_RNA <- df_RNA[-c(1:5),]
+
+### since gene name are in ACS form, let's convert it into gene name!
+library(EnsDb.Hsapiens.v79)
+
+# 1. Convert from ensembl.gene to gene.symbol
+ensembl.genes_split <- lapply(df_RNA$X, function(c) unlist(strsplit(as.character(c), "[.]"))[1])
+ensembl.genes_split <- unlist(ensembl.genes_split)
+df_RNA$X <- ensembl.genes_split
+
+geneIDs1 <- ensembldb::select(EnsDb.Hsapiens.v79, keys= ensembl.genes_split, keytype = "GENEID", columns = c("SYMBOL","GENEID"))
+
+### merge with the original dataset
+df_RNA_withGeneName <- merge(geneIDs1, df_RNA, by.x = "GENEID", by.y = "X")
+
+## Let's normalize the data
+df_RNA_withGeneName_Norm <- df_RNA_withGeneName
+df_RNA_withGeneName_Norm[,3:11] <- apply(df_RNA_withGeneName_Norm[,3:11],2, function(c) c/sum(c)*10^6)
+
+write.csv(df_RNA_withGeneName_Norm,"./Data/df_RNA_withGeneName_Norm.csv")
+### great! I have gene name for each gene Id
+
+#### let's read the protein file.
+df_Protein <- read.csv("./Data/Gastric/PatientCompartment=TCE_Normalized_Gastric_withGeneName_Filtered.csv")
+
+
+### let's merge protein and gene
+df_all_Pro <- read_xlsx("./Data/Gastric/RNASeq_withGeneName_Norm_withProteinInfo.xlsx", sheet = "Proteins")
+df_all_gene <- read_xlsx("./Data/Gastric/RNASeq_withGeneName_Norm_withProteinInfo.xlsx", sheet = "Genes")
+
+df_all_merge <- merge(df_all_Pro, df_all_gene, by.x = "GeneName", by.y = "SYMBOL")
+
+write.csv(df_all_merge, "./Output/Gene_Protein_Gastric.csv")
+
+# Great! let's do the correlation!
+df_all_merge_filter <- df_all_merge[apply(df_all_merge[,3:10], 1, function(c) sum(!is.na(c)))>2,]
+
+df_all_merge_filter <- df_all_merge[apply(df_all_merge[,3:10], 1, function(c) sum(c[!is.na(c)]))>20,]
+
+
+List_cor <- NA
+Name <- NA
+for (i in 1:dim(df_all_merge_filter)[1]){
+        print(i)
+        c <- df_all_merge_filter[i,]
+        List_cor[i] <- cor(c[3:10][!is.na(c[3:10])],c[12:19][!is.na(c[3:10])], method = "spearman")
+        Name[i] <- df_all_merge_filter$Accession[i]
+}
+
+df_Name_cor <- data.frame(Name,List_cor)
+### let's compare with totally randome data (let's confirm with Dr. James, Can I have different lenght for random data?)
+X <- matrix(sample(50000*8), ncol = 8)
+Y <- matrix(sample(50000*8), ncol = 8)
+
+All <- data.frame(X,Y)
+
+List_cor_Randome <- NA
+for (i in 1:50000){
+        r <- All[i,]
+        List_cor_Randome[i] <- cor(t(r[1:8]),t(r[9:16]), method = "spearman")
+}
+
+# Filled Density Plot
+d <- density(List_cor[!is.na(List_cor)])
+plot(d, main="Density of correlation", xlim = c(-1,1))
+polygon(d, col="orange", border="black", xlim = c(-1,1))
+
+library(ggplot2)
+
+#Sample data
+dat <- data.frame(dens = c(List_cor_Randome, List_cor)
+                   , lines = rep(c("randome","z_missing Proteins"),times = c(50000,dim(df_all_merge_filter)[1])))
+#Plot.
+ggplot(dat, aes(x = dens, fill = lines)) + geom_density(alpha = 0.8) + theme_bw() +scale_fill_manual( values = c("lightgray","lightblue"))
+
+
+### let's do the heamtmap of identified assecsion!
+
+## read the data first
+df_missing_normalized <- read.csv("./Data/CellLineCompartment_TCE_SumTickNormalization.csv",sep = "\t", skip = 2,row.names = 1)
+df_missing_normalized_all <- read.csv("./Data/CellLineCompartment_TCE_SumTickNormalization.csv",sep = "\t", header = F)
+
+## annotation column
+col_annotation <- data.frame("Cancer type"= t(df_missing_normalized_all[1,2:dim(df_missing_normalized_all)[2]]))
+
+col_annotation$X2 <- as.character(col_annotation$X1)
+col_annotation$X2[grep("Breast",col_annotation$X1)] = ("Breast")
+col_annotation$X2[grep("Leukemia",col_annotation$X1)] = ("Leukemia")
+col_annotation <- data.frame(col_annotation[,-c(1)])
+rownames(col_annotation) <- colnames(df_missing_normalized)
+colnames(col_annotation) <- c("Simplified Cancer type")
+
+
+### log2 scaling
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized)
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] = 0
+df_missing_normalized_matrix[df_missing_normalized_matrix!=0] = log10(df_missing_normalized_matrix[df_missing_normalized_matrix!=0])
+
+
+#### hmmm! well it is so spares, let's focus on those being repeated
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[rownames(df_missing_normalized_matrix) %in% Name,]
+
+# mat_colors <- list(group = brewer.pal(sum(!duplicated(col_annotation$`Simplifeid Cancer type`)), "Set3"))
+
+nb.cols <- sum(!duplicated(col_annotation$`Simplifeid Cancer type`))
+Var1 <- colorRampPalette(brewer.pal(8, "Pastel1"))(nb.cols)
+names(Var1) <- unique(col_annotation$`Simplifeid Cancer type`)
+anno_colors <- list(Var1 = Var1)
+
+breaksList = seq(0, 2, by = 0.05)
+pheatmap(df_missing_normalized_matrix_frequestnidentified,
+         #fontsize_col = 5, 
+         fontsize_row = 8,
+         # cutree_rows = 6,
+         #color = colorRampPalette(colors = c("black", "yellow", "darkorange"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = F,
+         main = "Total Cell Extract", 
+         cluster_cols = F,
+         cluster_rows = T,
+         annotation_colors = anno_colors,
+         annotation_col = col_annotation
+         )
+
+
+```
+
+
+
+## distribution of deteceted samples:
+
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+
+## let's read the table
+df_allproteins <- read_xlsx("./Data/Table1.xlsx", sheet = "Acc_Coverage")
+
+## let's dichotomize the number of samples detected
+df_allproteins$dich_smples <- df_allproteins$`N Samples Detected (Total 513 Cell Line and Patient Samples)`
+df_allproteins$numbersmpls <- df_allproteins$`N Samples Detected (Total 513 Cell Line and Patient Samples)`
+
+
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=0 & numbersmpls <5))] <- "[0-5)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=5 & numbersmpls <10))] <- "[5-10)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=10 & numbersmpls <25))] <- "[10-25)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=25 & numbersmpls <50))] <- "[25-50)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=50 & numbersmpls <100))] <- "[50-100)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=100 & numbersmpls <200))] <- "[100-200)"
+df_allproteins$dich_smples[with(df_allproteins, which(numbersmpls>=200))] <- "200+"
+
+barplot(table(df_allproteins$dich_smples))
+
+
+### also, let's plot the pie chart
+df_IPAout <- read.csv("./Data/IPA_forallmissingproteins.csv")
+
+summary <- data.frame(table(df_IPAout$Type.s.))
+summary <- summary[summary$Var1 != "other",]
+
+# 3D Exploded Pie Chart
+library(plotrix)
+pie3D(summary$Freq,explode=0)
+
+pie3D(summary$Freq, labels = summary$Var1,explode=0)
+
+```
+
+
+## let's focus on plasma samples right now
+```{r}
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+df_plasma <- read_xlsx("./Data/Plasma_AllQuant_missingProteins.xlsx")
+
+Gmean <- log2(df_plasma$GMean)
+hist(Gmean[!is.na(Gmean)], breaks = 50, col="red")
+hist(Gmean[!is.na(Gmean)], breaks = 50, col="grey")
+
+## how many unique proteins above FC of 2?
+
+
+df_plasma_hFC <- df_plasma[with(df_plasma, which(GMean>=2)),]
+sum(!duplicated(df_plasma_hFC$`protein name`))
+```
+
+
+### okay, Sam suggested new analysis. First, how many unique peptide?
+```{r}
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## let's read the unique peptide
+
+df_uniquepeptides <- read_xlsx("./Data/From Jen_UniquePeptides/UniquePeptides.xlsx")
+df_uniquepeptides$modefied <- df_uniquepeptides$`N(UniquePeptides)`
+df_uniquepeptides$modefied[df_uniquepeptides$modefied>=25] = 25
+
+
+hist(df_uniquepeptides$modefied, breaks = 35, col = "lightblue")
+
+```
+
+
+### what about number of LC-MS versus total numnber of detected proteins?
+```{r}
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+library(tidyr)
+library(dplyr)
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## now, let's read the file
+Fractions <- read.csv("./Data/Fractions.csv")
+
+Tablerepeat <- data.frame(table(Fractions$File))
+Tablerepeat$Runnumber <- 1:dim(Tablerepeat)[1]
+write.csv(Tablerepeat,"./Output/NumberofRun_identifiedFeatures.csv")
+
+```
+
+
+### Let's look at the plasma! only those that are not expressed in heathly controls
+
+```{r}
+
+## let read the required libraries
+rm(list = ls())
+library(readxl)
+library(pROC)
+# library(tidyr)
+library(dplyr)
+library(tidyr)
+library(dplyr)
+library(pheatmap)
+library(RColorBrewer)
+library(heatmap.plus)
+library(viridis)
+library(dendextend)
+
+
+## let's set the directory
+setwd("~/Box Sync/Missing protein project/")
+
+## let's read the file
+df_plasma <- read_xlsx("./Data/From Jen_UniquePeptides/Plasma_AllQuant_missingProteins_EhsanVersion.xlsx", sheet = "Plasma_AllQuant_peptides")
+
+df_plasma_short <- df_plasma[,c(2,3,6,10,12,13)]
+
+
+df_plasma_short_compressed <- df_plasma_short %>% group_by(Acc,gene,IPI,Assay) %>% summarise_each(sum)
+
+df_plasma_short_compressed <- df_plasma_short_compressed[with(df_plasma_short_compressed, which(Q3L < 1)),]
+
+df_plasma_sampleinfo <- read_xlsx("./Data/From Jen_UniquePeptides/Plasma_AllQuant_missingProteins_EhsanVersion.xlsx", sheet = "SupplementExperiment")
+
+
+df_plasma_short_compressed_wSampleinfo <- merge(df_plasma_short_compressed,df_plasma_sampleinfo, by.x = "Assay", by.y="IPAS")
+
+
+df_plasma_short_compressed_wSampleinfo_selecteddisease <- df_plasma_short_compressed_wSampleinfo[with(df_plasma_short_compressed_wSampleinfo, which(Disease == "Breast" | Disease == "Colon" | Disease == "Lung" | Disease == "Pancreatic")),]
+
+## great! Let's overlap them with tissue expression
+
+dfnormalTissue <- read.table(file = '~/Desktop/big files/rna_tissue_consensus.tsv', sep = '\t', header = TRUE)
+
+library(reshape2)
+dfnormalTissue_matrix <- acast(dfnormalTissue, dfnormalTissue$Gene.name~dfnormalTissue$Tissue,value.var = "NX", fun.aggregate = sum)
+
+dfnormalTissue_matrix_backup <- dfnormalTissue_matrix
+
+dfnormalTissue_matrix <- apply(dfnormalTissue_matrix, 1, function(c) c/sum(c)*10)
+dfnormalTissue_matrix_t <- data.frame(t(dfnormalTissue_matrix))
+dfnormalTissue_matrix_t$gene <- rownames(dfnormalTissue_matrix_t)
+### merge with plasma samples
+
+
+
+df_merge_selected_tissue <- merge(df_plasma_short_compressed_wSampleinfo_selecteddisease, dfnormalTissue_matrix_t, by.x = "gene", by.y = "gene", all.x = TRUE)
+
+write.csv(df_merge_selected_tissue, "./Output/onlycasesinPlasma_overlapwithTissue.csv")
+
+## let's sort it by disease
+df_merge_selected_tissue <- df_merge_selected_tissue[order(df_merge_selected_tissue$Disease),]
+## now, let's plot the heatmap
+df_heatmapplasma <- as.matrix(df_merge_selected_tissue[,c(24:dim(df_merge_selected_tissue)[2])])
+df_heatmapplasma[is.na(df_heatmapplasma)] <- 0
+rownames(df_heatmapplasma) <- paste0(df_merge_selected_tissue$Assay," ",df_merge_selected_tissue$Acc)
+
+## rowannotation
+df_heatmapplasma_rowannot <- as.matrix(df_merge_selected_tissue[,"Disease"])
+rownames(df_heatmapplasma_rowannot) <- rownames(df_heatmapplasma)
+df_heatmapplasma_rowannot <- as.data.frame(df_heatmapplasma_rowannot)
+colnames(df_heatmapplasma_rowannot) <- "Cancer type"
+
+breaksList = seq(0, 10, by = 0.1)
+pheatmap(as.data.frame(df_heatmapplasma),
+         fontsize_col = 7, 
+         fontsize_row = 3,
+         # cutree_rows = 6,
+         color = colorRampPalette(colors = c("lightblue", "white", "red"))(length(breaksList)),
+         show_rownames = T,
+         show_colnames = T,
+         main = "Normal Tissue expression", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_row = df_heatmapplasma_rowannot
+         )
+
+```
+

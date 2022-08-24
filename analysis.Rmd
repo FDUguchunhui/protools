@@ -1,0 +1,99 @@
+---
+title: "analysis"
+output: html_document
+date: "2022-07-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("DEqMS")
+```
+
+```{r}
+library(DEqMS)
+library(tidyverse)
+library(pheatmap)
+```
+
+
+# Reading data
+```{r}
+df_missing_normalized <- read_tsv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", skip=2)
+annotation <- read_tsv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", n_max=3, col_select = c(-1), col_names = F)
+```
+
+## create column annotation
+```{r}
+col_annotation <- tibble(full_name = colnames(df_missing_normalized_all[2:ncol(df_missing_normalized_all)]))
+col_annotation <- col_annotation %>% mutate(simplified_cancer_type = if_else(str_detect(full_name, 'Breast'), 'Breast', 
+                                                           if_else(str_detect(full_name, 'Leukemia'), 'Leukemia', 'Other')))
+```
+
+
+# Heatmap
+
+```{r}
+df_missing_normalized_matrix <- as.matrix(df_missing_normalized_all[-1])
+rownames(df_missing_normalized_matrix) <-  pull(df_missing_normalized_all[1])
+df_missing_normalized_matrix[is.na(df_missing_normalized_matrix)] <-  0
+df_missing_normalized_matrix <- log2(df_missing_normalized_matrix + 1)
+
+# annotation_col is a dataframe with rownames corresponding to the colnames in the feeded matrix
+pheatmap(df_missing_normalized_matrix,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "Surface", 
+         cluster_cols = F,
+         cluster_rows = F,
+         annotation_col = data.frame(col_annotation[2], row.names = col_annotation$full_name))
+```
+
+# Data processing
+```{r}
+# ??
+# only leave those spread apart? 
+df_missing_normalized_matrix_frequestnidentified <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sd(c)>0.1),]
+
+
+
+
+# number of valid count in each group should be 2
+df_missing_normalized_matrix_filtered <- df_missing_normalized_matrix[apply(df_missing_normalized_matrix, 1, function(c) sum(c!=0) >= 5), ]
+```
+
+```{r}
+library(roxygen2)
+
+#' create data matrix based on conditions to compared and number of valid values per condition
+#' 
+#' @param 
+#' @return
+contrast_dependent_missing_handling <- function(X, col_annotation, condition1, condition2, min_num_valids) {
+  col_conditions <- col_annotation[colnames(X), ]
+  newX <- X[ , col_conditions == 'Breast' | col_conditions == 'Leukemia']
+  # minimum number of valid per condition
+  condition1_matrix <- newX[, col_annotation[colnames(newX), ] == condition1]
+  condition1_filter <- apply(condition1_matrix, 1, function(c) sum(c!=0) >= min_num_valids)
+  
+  condition2_matrix <- newX[, col_annotation[colnames(newX), ] == condition2]
+  condition2_filter <- apply(condition2_matrix, 1, function(c) sum(c!=0) >= min_num_valids)
+  newX <- newX[condition1_filter & condition2_filter, ]
+  return(newX)
+}
+```
+
+```{r}
+# col_annotation <- data.frame(col_annotation[2], row.names = col_annotation$full_name)
+cd <- contrast_dependent_missing_handling(df_missing_normalized_matrix, col_annotation, 'Breast', 'Leukemia', 2)
+```
+

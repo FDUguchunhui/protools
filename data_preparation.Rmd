@@ -1,0 +1,461 @@
+---
+title: "data_preparation"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-08-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(edgeR)
+library(pheatmap)
+library(RColorBrewer)
+library(EnhancedVolcano)
+```
+
+
+```{r}
+alldata <- read_csv('data/ALL_Protein_MS2.csv', col_types = cols(
+  Gene = col_character(),
+  PreferName = col_character(),
+  Accession = col_character(),
+  IPAS = col_character(),
+  SampleDescription = col_character(),
+  ExperimentType = col_character(),
+  Disease = col_character(),
+  SubType = col_character(),
+  MW = col_double(),
+  TCETotalPep = col_double(),
+  MediaTotalPep = col_double(),
+  MediaNRatio = col_double(),
+  SurfaceTotalPep = col_double(),
+  SurfaceNRatio = col_double(),
+  NuclearTotalPep = col_double(),
+  NuclearNRatio = col_double(),
+  TCENumIndisPro = col_double(),
+  MediaNumIndisPro = col_double(),
+  SurfaceNumIndisPro = col_double(),
+  NuclearNumIndisPro = col_double())
+  )
+```
+
+
+gene name is unique but there are some proteins weren't matched to a gene
+warning: ignore those proteins now
+
+
+# need to deal with gene or protein (isoform) level
+```{r}
+alldata %>% filter(IPAS == 'IP0417_1701') %>% select(PreferName) %>% filter(is.na(PreferName))
+```
+
+
+```{r}
+head(alldata)
+```
+
+```{r}
+dat <- alldata %>% 
+  select(c('Accession', 'IPAS', 'TCETotalPep')) %>% 
+   pivot_wider('Accession', names_from='IPAS', values_from = 'TCETotalPep')
+  # only use the primary accession (? will have duplicate row)
+  
+dat$Accession  <- sapply(strsplit(dat$Accession, ','), '[[', 1)
+  
+dat <- dat %>% 
+  group_by(Accession) %>% 
+  summarise_all(.funs = sum, na.rm=TRUE)
+
+# rm(alldata)
+
+# save(dat, file = 'SpC.rda')
+```
+
+
+# create annotation table
+```{r}
+IPAS_annotation <- alldata %>% select('ExperimentType', 'Disease', 'SubType', 'IPAS') %>% 
+  unique()
+
+save(IPAS_annotation, file= 'IPAS_annotation.rda')
+```
+
+
+
+# accession map to gene dictionary
+```{r}
+dat_for_mapping_acc_to_gene <- alldata %>% 
+  select(PreferName, Accession) 
+  # only use the primary accession (? will have duplicate row)
+  
+dat_for_mapping_acc_to_gene$Accession  <- sapply(strsplit(dat_for_mapping_acc_to_gene$Accession, ','), '[[', 1)
+
+acc_to_gene_dict <- dat_for_mapping_acc_to_gene %>% distinct()
+```
+
+
+
+
+```{r}
+# a small sample data for testing
+dat_lite <- dat[sample(1:nrow(dat), 10000), c(1, sample(2:ncol(dat), 10))]
+# dat_lite_IPAS_annotation <- 
+```
+
+```{r}
+hist(sapply(dat[, -1], sum, na.rm=T))
+```
+
+
+
+# check whether the distribution is homogenous
+```{r}
+dat_lite %>% pivot_longer(cols=!Accession, names_to = 'replicate', values_to = 'count') %>% 
+  ggplot(aes(x=count)) +
+  geom_histogram() +
+  facet_wrap(~ replicate)
+```
+
+# save data
+```{r}
+write_csv(dat, file = 'data/raw_spectral_count_all.csv')
+```
+
+
+
+
+
+
+
+
+
+
+# ============================================================================
+# ============================================================================
+```{r}
+library(tidyverse)
+library(edgeR)
+library(pheatmap)
+library(RColorBrewer)
+library(EnhancedVolcano)
+```
+
+
+# Reading data
+```{r}
+SpC <- read_csv("data/raw_spectral_count_all.csv", show_col_types = FALSE)
+load('IPAS_annotation.rda')
+```
+
+# create corresponding count matrix
+```{r}
+SpC_matrix <- as.matrix(SpC[-1])
+rownames(SpC_matrix) <-  pull(SpC[1])
+# SpC_matrix[is.na(SpC_matrix)] <-  0
+# SpC_matrix <- log2(SpC_matrix + 1)
+```
+
+
+# Exploration
+
+#check underlying assumption for NB model
+```{r}
+pseudo_counts <- log(SpC_matrix + 1)
+ggplot(data = data.frame(x=c(as.matrix(pseudo_counts))), aes(x=x)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25)
+```
+
+
+# use to check normalization status
+```{r}
+boxplot(pseudo_counts[, 1:10])
+```
+
+
+
+# Missing data handling 
+
+## missing count
+
+The number of proteins is very high in the merged dataset, could it is because
+we use a large target database for searching matched proteins or because each group
+of sample has some unique proteins and merged them together create a lot of zero
+in the other group?
+```{r}
+# none of proteins has valid value in all replicates 
+SpC %>% summarise(num_of_proteins = n())
+SpC %>% drop_na() %>% summarise(num_of_proteins = n())
+```
+
+## simple imputation: replace NA as 0
+```{r}
+# SpC <- SpC %>% mutate_all(~replace(., is.na(.), 0))
+SpC_matrix[is.na(SpC_matrix)] <- 0
+```
+
+
+## remove replicates that library size is 0
+```{r}
+zero_library_filter <- apply(SpC_matrix, 2, sum) != 0
+SpC_matrix <- SpC_matrix[, zero_library_filter]
+annotation <- IPAS_annotation[zero_library_filter, ]
+```
+
+
+
+## pre-filter
+https://support.bioconductor.org/p/64484/
+filter proteins that has at least 5 counts in at least N group
+N is the size of the smallest group
+However, using count-based model should be robust against low count issue
+https://www.mathworks.com/help/stats/negative-binomial-distribution.html
+
+```{r}
+N <- min(table(IPAS_annotation$Disease))
+keep <- rowSums(SpC_matrix > 10) >= N
+SpC_matrix_dense <- SpC_matrix[keep,]
+
+# SpC_matrix_dense <- SpC_matrix[apply(SpC_matrix, 1, function(c) sum(c!=0) >= 100), ]
+```
+
+recheck overall distribution
+```{r}
+ggplot(data = data.frame(x=c(SpC_matrix_dense)), aes(x=x)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25)
+```
+
+# tag-wise distribution
+the majority of proteins should be non-differentially expressed so they will follow a NB distribution
+there is no evidence of bimodal issue 
+
+! after find high-confident DEPs, come back to check its distribution (how it violate NB distribution)
+```{r}
+set.seed(1010)
+sample_filter <- sample(1:nrow(SpC_matrix_dense), 100)
+density_plot_dat <- t(SpC_matrix_dense[sample_filter, ]) %>% as_tibble() %>% pivot_longer(cols = everything(), names_to = 'Accession', values_to = 'count') 
+ggplot(data = density_plot_dat, aes(x=count, color=Accession)) + 
+  geom_density(alpha = 0.2) +
+  scale_x_continuous(breaks=0:3, limits=c(0, 3)) +
+  theme(legend.position="none")
+```
+
+
+
+
+# sample(replicate)-wise count distribution 
+The distribution they follows isn't important. What is important is whether they 
+are similar to each other. Should remove outlier before normalization otherwise
+it will bias normalization for the other samples.
+```{r}
+density_plot_dat <- SpC_matrix_dense %>% as_tibble() %>% pivot_longer(cols = everything(), names_to = 'IPAS', values_to = 'count')
+ggplot(data = density_plot_dat, aes(x=log(count+1), fill=IPAS)) + 
+  geom_density(alpha = 0.3) +
+  scale_x_continuous(breaks=0:5, limits=c(0, 5)) +
+  theme(legend.position="none")
+```
+
+
+# create DGEList data class
+
+# need find another way to include gene annotation in the DEGList object
+```{r}
+dict <-  deframe(acc_to_gene_dict[, c(2,1)])
+rownames(SpC_matrix_dense) <- dict[rownames(SpC_matrix_dense)]
+genename_filter  <- !is.na(rownames(SpC_matrix_dense))
+SpC_matrix_dense <- SpC_matrix_dense[!is.na(rownames(SpC_matrix_dense)), ]
+
+group <- factor(annotation$Disease)
+y <- DGEList(SpC_matrix_dense, group = group)
+```
+
+
+<!-- # Filtering -->
+<!-- Should I filter protein with too less expression? -->
+<!-- prefer not to filter now cause missing proteins are too sparse -->
+
+
+
+# normalization
+TMM normalization is used.
+TMM normalization will adjust library size to ensure that the majority of proteins were not 
+differentially expressed.
+```{r}
+y <- calcNormFactors(y)
+```
+
+ 
+
+# edgeR estimate overdispersion parameters
+Breast is used as control group
+```{r}
+design <- model.matrix(~group)
+colnames(design) <- str_replace(colnames(design), 'group', '')
+y <- estimateDisp(y, design = design, robust=TRUE)
+
+fit <- glmQLFit(y, design, robust = TRUE)
+```
+
+
+# ANOVA test
+```{r}
+ANOVA_test <- glmQLFTest(fit, coef=colnames(design)[-1])
+```
+
+# pair-wise test
+```{r}
+Contrast_Colon_breast_test <- glmQLFTest(fit, coef=c('Colon'))
+```
+
+
+
+
+# post-filter
+https://pubmed.ncbi.nlm.nih.gov/23770383/
+refer to An effect size filter improves the reproducibility in spectral counting-based comparative proteomics
+```{r}
+ANOVA_DEPs
+```
+
+
+
+
+```{r}
+ANOVA_DEPs <- topTags(ANOVA_test, Inf, p.value = 0.05)
+DEPs <- topTags(Contrast_Colon_breast_test, Inf, p.value = 0.05)
+```
+
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("GO.db")
+
+# goana(test)
+```
+
+
+```{r}
+# plotMDS(y, labels = group, col=group)
+```
+
+```{r}
+plotBCV(y)
+```
+
+```{r}
+plotQLDisp(fit)
+```
+
+
+```{r}
+plotMD(Contrast_Colon_breast_test)
+abline(h=c(-1, 1), col="blue")
+```
+
+
+# MDS (PCA)
+the first two-dimension only explain 28% percent of variation
+MDS plot may not be very useful for clustering.
+```{r}
+MDS_plot <- plotMDS(y, top=500, labels = annotation$Disease)
+```
+
+
+```{r}
+ggplot(data=tibble(x=MDS_plot$x, y=MDS_plot$y, type=as.factor(annotation$Disease)), aes(x=x, y=y, color=type)) +
+  geom_point()
+```
+
+
+
+# Visulation
+
+## Heatmap for DE proteins in ANOVA test
+```{r}
+# heatmap_dat <- cpm(y, normalized.lib.sizes = TRUE, log=TRUE, prior.count = 2)
+```
+
+```{r}
+log_SpC <- log(SpC_matrix_dense[rownames(ANOVA_DEPs$table), ] + 1)
+# annotation_col is a dataframe with rownames corresponding to the colnames in the feeded matrix
+pheatmap(log_SpC,
+         #fontsize_col = 5, 
+         #fontsize_row = 4,
+         show_rownames = F,
+         show_colnames = F,
+         main = "TCE", 
+         cluster_cols = T,
+         cluster_rows = T,
+         annotation= data.frame(annotation$Disease, row.names=annotation$IPAS))
+```
+
+```{r}
+  # if (!requireNamespace('BiocManager', quietly = TRUE))
+  #   install.packages('BiocManager')
+  # 
+  # BiocManager::install('EnhancedVolcano')
+
+
+ EnhancedVolcano(Contrast_Colon_breast_test$table,
+    lab = rownames(Contrast_Colon_breast_test$table),
+    x = 'logFC',
+    y = 'PValue')
+```
+
+# Venn diagram
+```{r}
+
+```
+
+
+
+
+# GO ontology and pathway analysis
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("GO.db")
+# BiocManager::install("org.Hs.eg.db")
+
+
+go <- goana(Contrast_Colon_breast_test, species='Hs')
+topGO(go, sort='up')
+```
+
+
+
+# KEGG
+```{r}
+kegga(fit)
+```
+
+
+
+
+
+
+# other processing
+1. collapse cancer type category
+2. fold-change threshold
+3. need corresponding gene name for GO and KEGG analysis
+
+
+
+
+
+
+# concerns:
+imputation missing value with 0 may not be correct
