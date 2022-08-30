@@ -41,5 +41,6 @@ vignettes/*.pdf
 
 # all data files
 data/*
+output/*
 
 .DS_Store

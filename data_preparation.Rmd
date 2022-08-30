@@ -21,116 +21,48 @@ library(EnhancedVolcano)
 
 
 ```{r}
-alldata <- read_csv('data/ALL_Protein_MS2.csv', col_types = cols(
-  Gene = col_character(),
-  PreferName = col_character(),
-  Accession = col_character(),
-  IPAS = col_character(),
-  SampleDescription = col_character(),
-  ExperimentType = col_character(),
-  Disease = col_character(),
-  SubType = col_character(),
-  MW = col_double(),
-  TCETotalPep = col_double(),
-  MediaTotalPep = col_double(),
-  MediaNRatio = col_double(),
-  SurfaceTotalPep = col_double(),
-  SurfaceNRatio = col_double(),
-  NuclearTotalPep = col_double(),
-  NuclearNRatio = col_double(),
-  TCENumIndisPro = col_double(),
-  MediaNumIndisPro = col_double(),
-  SurfaceNumIndisPro = col_double(),
-  NuclearNumIndisPro = col_double())
-  )
+SpC <- read_csv('data/ALL_Protein_MS2.csv', skip = 3, show_col_types=FALSE)
+head(SpC)
 ```
-
-
-gene name is unique but there are some proteins weren't matched to a gene
-warning: ignore those proteins now
-
-
-# need to deal with gene or protein (isoform) level
-```{r}
-alldata %>% filter(IPAS == 'IP0417_1701') %>% select(PreferName) %>% filter(is.na(PreferName))
-```
-
-
-```{r}
-head(alldata)
-```
-
-```{r}
-dat <- alldata %>% 
-  select(c('Accession', 'IPAS', 'TCETotalPep')) %>% 
-   pivot_wider('Accession', names_from='IPAS', values_from = 'TCETotalPep')
-  # only use the primary accession (? will have duplicate row)
-  
-dat$Accession  <- sapply(strsplit(dat$Accession, ','), '[[', 1)
-  
-dat <- dat %>% 
-  group_by(Accession) %>% 
-  summarise_all(.funs = sum, na.rm=TRUE)
-
-# rm(alldata)
-
-# save(dat, file = 'SpC.rda')
-```
-
 
 # create annotation table
 ```{r}
-IPAS_annotation <- alldata %>% select('ExperimentType', 'Disease', 'SubType', 'IPAS') %>% 
-  unique()
-
-save(IPAS_annotation, file= 'IPAS_annotation.rda')
+IPAS_annotation <- read_csv('data/ALL_Protein_MS2.csv', n_max = 4, col_select = -1, col_names = FALSE, show_col_types = FALSE)
+IPAS_annotation <- IPAS_annotation %>% t()
+col_name <- c('cell_line', 'disease', 'subtype', 'IPAS')
+IPAS_annotation <- IPAS_annotation[-1, ] %>% as_tibble()
+colnames(IPAS_annotation) <- col_name
+head(IPAS_annotation)
 ```
+
 
 
 
 # accession map to gene dictionary
 ```{r}
-dat_for_mapping_acc_to_gene <- alldata %>% 
-  select(PreferName, Accession) 
+dat_for_mapping_acc_to_gene <- SpC %>% 
+  select(Gene, Accession) 
   # only use the primary accession (? will have duplicate row)
-  
-dat_for_mapping_acc_to_gene$Accession  <- sapply(strsplit(dat_for_mapping_acc_to_gene$Accession, ','), '[[', 1)
 
 acc_to_gene_dict <- dat_for_mapping_acc_to_gene %>% distinct()
 ```
 
-
-
-
+# collapse cancer category
 ```{r}
-# a small sample data for testing
-dat_lite <- dat[sample(1:nrow(dat), 10000), c(1, sample(2:ncol(dat), 10))]
-# dat_lite_IPAS_annotation <- 
-```
-
-```{r}
-hist(sapply(dat[, -1], sum, na.rm=T))
+IPAS_annotation <- IPAS_annotation %>% mutate(disease = if_else(disease %in% c('Melanoma', 'Lymphoblast', 'Neuroblastoma', 'Prostate'), 'Other', disease))
 ```
 
 
-
-# check whether the distribution is homogenous
+# Missing protein
 ```{r}
-dat_lite %>% pivot_longer(cols=!Accession, names_to = 'replicate', values_to = 'count') %>% 
-  ggplot(aes(x=count)) +
-  geom_histogram() +
-  facet_wrap(~ replicate)
+missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- missing_protein_df[-c(1:12), ]
+head(missing_protein_df)
 ```
 
-# save data
 ```{r}
-write_csv(dat, file = 'data/raw_spectral_count_all.csv')
+
 ```
-
-
-
-
-
 
 
 
@@ -147,39 +79,17 @@ library(EnhancedVolcano)
 ```
 
 
-# Reading data
-```{r}
-SpC <- read_csv("data/raw_spectral_count_all.csv", show_col_types = FALSE)
-load('IPAS_annotation.rda')
-```
-
 # create corresponding count matrix
 ```{r}
-SpC_matrix <- as.matrix(SpC[-1])
-rownames(SpC_matrix) <-  pull(SpC[1])
-# SpC_matrix[is.na(SpC_matrix)] <-  0
-# SpC_matrix <- log2(SpC_matrix + 1)
+SpC_matrix <- as.matrix(SpC[-c(1, 2)])
+rownames(SpC_matrix) <-  pull(SpC[2])
+
+
+SpC_matrix[is.na(SpC_matrix)] <-  0
 ```
 
 
 # Exploration
-
-#check underlying assumption for NB model
-```{r}
-pseudo_counts <- log(SpC_matrix + 1)
-ggplot(data = data.frame(x=c(as.matrix(pseudo_counts))), aes(x=x)) + 
-  geom_histogram(aes(y = ..density..),
-                 colour = 1, fill = "white") +
-  geom_density(lwd = 1, colour = 4,
-               fill = 4, alpha = 0.25)
-```
-
-
-# use to check normalization status
-```{r}
-boxplot(pseudo_counts[, 1:10])
-```
-
 
 
 # Missing data handling 
@@ -220,8 +130,8 @@ However, using count-based model should be robust against low count issue
 https://www.mathworks.com/help/stats/negative-binomial-distribution.html
 
 ```{r}
-N <- min(table(IPAS_annotation$Disease))
-keep <- rowSums(SpC_matrix > 10) >= N
+N <- min(table(IPAS_annotation$disease))
+keep <- rowSums(SpC_matrix > 5) >= N
 SpC_matrix_dense <- SpC_matrix[keep,]
 
 # SpC_matrix_dense <- SpC_matrix[apply(SpC_matrix, 1, function(c) sum(c!=0) >= 100), ]
@@ -271,12 +181,12 @@ ggplot(data = density_plot_dat, aes(x=log(count+1), fill=IPAS)) +
 
 # need find another way to include gene annotation in the DEGList object
 ```{r}
-dict <-  deframe(acc_to_gene_dict[, c(2,1)])
-rownames(SpC_matrix_dense) <- dict[rownames(SpC_matrix_dense)]
-genename_filter  <- !is.na(rownames(SpC_matrix_dense))
-SpC_matrix_dense <- SpC_matrix_dense[!is.na(rownames(SpC_matrix_dense)), ]
+# dict <-  deframe(acc_to_gene_dict[, c(2,1)])
+# rownames(SpC_matrix_dense) <- dict[rownames(SpC_matrix_dense)]
+# genename_filter  <- !is.na(rownames(SpC_matrix_dense))
+# SpC_matrix_dense <- SpC_matrix_dense[!is.na(rownames(SpC_matrix_dense)), ]
 
-group <- factor(annotation$Disease)
+group <- factor(annotation$disease)
 y <- DGEList(SpC_matrix_dense, group = group)
 ```
 
@@ -324,15 +234,16 @@ Contrast_Colon_breast_test <- glmQLFTest(fit, coef=c('Colon'))
 # post-filter
 https://pubmed.ncbi.nlm.nih.gov/23770383/
 refer to An effect size filter improves the reproducibility in spectral counting-based comparative proteomics
+
+
 ```{r}
-ANOVA_DEPs
+ANOVA_DEPs <- topTags(ANOVA_test, Inf, p.value = 0.05)$table
+ANOVA_missing_DEPs <- ANOVA_DEPs[rownames(ANOVA_DEPs) %in% missing_protein_df$Accession, ]
+mean(rownames(ANOVA_missing_DEPs) %in% unique_DEPs)
 ```
 
 
-
-
 ```{r}
-ANOVA_DEPs <- topTags(ANOVA_test, Inf, p.value = 0.05)
 DEPs <- topTags(Contrast_Colon_breast_test, Inf, p.value = 0.05)
 ```
 
@@ -369,12 +280,12 @@ abline(h=c(-1, 1), col="blue")
 the first two-dimension only explain 28% percent of variation
 MDS plot may not be very useful for clustering.
 ```{r}
-MDS_plot <- plotMDS(y, top=500, labels = annotation$Disease)
+MDS_plot <- plotMDS(y, top=10000, labels = IPAS_annotation$disease)
 ```
 
 
 ```{r}
-ggplot(data=tibble(x=MDS_plot$x, y=MDS_plot$y, type=as.factor(annotation$Disease)), aes(x=x, y=y, color=type)) +
+ggplot(data=tibble(x=MDS_plot$x, y=MDS_plot$y, type=as.factor(annotation$disease)), aes(x=x, y=y, color=type)) +
   geom_point()
 ```
 
@@ -443,6 +354,19 @@ kegga(fit)
 ```
 
 
+# Missing proteins
+```{r}
+missing_DEPs <- ANOVA_DEPs$table %>% as_tibble(rownames = 'Accession') %>% filter(Accession %in% missing_protein_df$Accession)
+```
+
+
+
+
+
+
+```{r}
+
+```
 
 
 

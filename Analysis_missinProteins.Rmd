@@ -156,12 +156,12 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing_normalized <- read.csv("./Data/CellLineCompartment_Surface_SumTickNormalization.csv",sep = "\t", skip = 2,row.names = 1)
@@ -232,12 +232,12 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing_normalized <- read.csv("./Data/CellLineCompartment_Media_SumTickNormalization.csv", skip = 2,row.names = 1)
@@ -308,12 +308,12 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing_normalized <- read.csv("./Data/CellLineCompartment_Nuclear_SumTickNormalization.csv",sep = "\t", skip = 2,row.names = 1)
@@ -385,12 +385,12 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing_normalized <- read.csv("./Data/CellLineCompartment_Exosome_SumTickNormalization.csv", skip = 2,row.names = 1)
@@ -462,12 +462,12 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing_normalized <- read.csv("./Data/MHC_SumTickNormalization.csv", skip = 2,row.names = 1)
@@ -535,10 +535,10 @@ rm(list = ls())
 library(readxl)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
-df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Acc_Coverage")
+# df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Acc_Coverage")
 
 df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)`[df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)` >= 50] = 50
 hist(df_missing$`N Samples Detected (Total 513 Cell Line and Patient Samples)`, col = "red", breaks = 100, xlab = "Number of Samples", ylab = "Frequency", xlim = c(0,50))
@@ -553,7 +553,7 @@ rm(list = ls())
 library(readxl)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Table1_data")
@@ -572,7 +572,7 @@ rm(list = ls())
 library(readxl)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## read the data first
 df_missing <- read_xlsx("./Data/Table1.xlsx",sheet = "Table1_data")
@@ -680,7 +680,7 @@ library(tidyr)
 library(dplyr)
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 df_RNA <- read.csv("./Data/Gastric/From Candy/merged_IPAS_RNAseq_counts.csv")
 df_RNA <- df_RNA[-c(1:5),]
@@ -947,13 +947,13 @@ library(tidyr)
 library(dplyr)
 library(pheatmap)
 library(RColorBrewer)
-library(heatmap.plus)
+# library(heatmap.plus)
 library(viridis)
 library(dendextend)
 
 
 ## let's set the directory
-setwd("~/Box Sync/Missing protein project/")
+# setwd("~/Box Sync/Missing protein project/")
 
 ## let's read the file
 df_plasma <- read_xlsx("./Data/From Jen_UniquePeptides/Plasma_AllQuant_missingProteins_EhsanVersion.xlsx", sheet = "Plasma_AllQuant_peptides")
