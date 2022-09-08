@@ -2,8 +2,8 @@ Package: project
 Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: 
-    person("Chunhui", "Gu", , "chunhui.gu@uth.tmc.edu", role = 'author')
-Description: a useful package for automating proteomics workflow
+    person("Chunhui", "Gu", email="chunhui.gu@uth.tmc.edu", role = c('aut', 'cre'))
+Description: a useful package for automating proteomics workflow for Dr. Samir M. Hanash's lab
 License: use_mit_license()
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

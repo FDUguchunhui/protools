@@ -1,0 +1,66 @@
+---
+title: "analysis_nucleas"
+output: html_document
+date: "2022-09-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# Reading data
+```{r}
+SpC <- read.delim("data/CellLineCompartment_Nuclear_SumTickNormalization.csv", sep = '\t', skip=2, row.names = 'Accession')
+# annotation <- read_tsv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", n_max=3, col_select = c(-1), col_names = F, show_col_types = FALSE)
+```
+
+## create column annotation
+```{r}
+disease_fulltype <- str_extract(colnames(SpC), '.+(?=\\.IP)')
+disease <- disease_fulltype
+disease[str_detect(disease_fulltype, 'Breast')] <- 'Breast'
+disease[str_detect(disease_fulltype, 'Leukemia')] <- 'Leukemia'
+IPAS_annotation <- data.frame(disease = disease, row.names = colnames(SpC))
+# should I use Pediatric GVHD as control?
+unique(disease)
+```
+
+
+## read-in newest missing protein list
+```{r}
+missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- missing_protein_df[-c(1:12), ]
+head(missing_protein_df)
+```
+
+#===============================================================================
+# Analysis
+```{r}
+y <- SpC_List(SpC, IPAS_annotation, NA_substitution = 0, proteins_filter = missing_protein_df$Accession)
+```
+
+
+
+run test and get test result
+```{r}
+res_lst <- one_vs_all_test(y, logFC = 1, PAjusted = 0.05)
+```
+
+
+get unique DEMPs
+```{r}
+unique_DEPs_nucleas <- unique(unlist(lapply(res_lst, rownames)))
+# paste0(unique_DEPs, collapse = ',')
+```
+
+
+# Visulization
+```{r}
+plot_heat_map(y, upper_limit = 5, row_keep = unique_DEPs_nucleas, show_rownames = F, main='Cell Component Nucleas')
+```
+
+
+
+

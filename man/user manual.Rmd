@@ -1,0 +1,15 @@
+---
+title: "manual"
+output: html_document
+date: "2022-09-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# simulate data
+```{r}
+pois(100, 100)
+```
+
