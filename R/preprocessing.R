@@ -27,7 +27,6 @@
 #' 
 
 SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL, replicates_remove=NULL) {
-  return_lst <- list()
   SpC_matrix <- as.matrix(df)
   
   # if need to substitute NA 
@@ -42,6 +41,7 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
     after <- nrow(SpC_matrix)
     message('Number of rows before filtering: ', before)
     message('Number of rows after filtering: ', after)
+    message()
   }
    
   # if need to remove replicate (sample) from the corresponding column
@@ -52,10 +52,14 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
     after <- ncol(SpC_matrix)
     message('Number of columns before filtering: ', before)
     message('Number of columns after filtering: ', after)
+    message()
   }
   
-  return_lst[['matrix']] <- SpC_matrix
-  return_lst[['annotation']] <- annotation
-  class(return_lst) <- 'SpC_list'
-  return(return_lst)
+  # create a class "SpC_list"
+  
+  out <- new('SpC_list', list(matrix=SpC_matrix, annotation=annotation))
+  # return_lst[['matrix']] <- SpC_matrix
+  # return_lst[['annotation']] <- annotation
+  # class(return_lst) <- 'SpC_list'
+  return(out)
 }

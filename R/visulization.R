@@ -63,7 +63,7 @@ basic_describe <- function(x, boxplot_main='Distribution', piechart_main='Group'
   
   # boxplot for spectral count distribution in each replicate
   if (plot_boxplot) {
-    boxplot(y$matrix, names=FALSE, main=boxplot_main)
+    boxplot(x$matrix, names=FALSE, main=boxplot_main)
   }
  
   if (plot_piechart) {
@@ -78,12 +78,77 @@ basic_describe <- function(x, boxplot_main='Distribution', piechart_main='Group'
     plot_heat_map(x, ...)
   }
  
+  return(NULL)
   
 }
 
 
+#' @export
+#' @title Custumorized Venn diagram plot
+#' @description This is wrapper function for VennDiagram::venn.diagram function
+#' with a preset of parameters. It will output to R viewer instead of as a file
+#' @param x a list of character vectors whose overlappings you want to plot 
+#' @param main the tilte of the plot
+#' 
+plot_venn_diagram <- function(top_GOs, main='Title', ...) {
+  
+  pathways <- lapply(top_GOs, '[[', 'Term')
+  myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+  
+  venn <- VennDiagram::venn.diagram(
+    x = pathways[-3],
+    category.names = names(pathways[-3]),
+    main=main,
+    filename = NULL,
+    
+    # Output features 
+    imagetype="png" ,
+    height = 480 ,
+    width = 600 , 
+    resolution = 300,
+    compression = "lzw",
+    
+    # Circles
+    lwd = 2,
+    lty = 'blank',
+    fill = myCol,
+    
+    # Numbers
+    cex = 2,
+    fontface = "bold",
+    fontfamily = "sans",
+    
+    # Set names
+    cat.cex = 2,
+    cat.fontface = "bold",
+    cat.default.pos = "outer",
+    ...
+  )
+  grid::grid.newpage()
+  grid::grid.draw(venn)
+}
 
 
+
+#' @export
+#' @title Plot bubble plot for enrichment analysis results 
+#' @description 
+#' @param data result 
+#' 
+bubble_plot <- function(data, title=NULL) {
+  
+  ggplot(data = data) +
+    geom_point(aes(x = Term, y= DE, size =  DE, color = P.DE)) +
+    coord_flip() +
+    labs(title = title, size = '# of Genes DE', color = 'pvalue DE') +
+    ylab('') +
+    xlab('Genes') +
+    guides(
+      color = guide_colorbar(order = 0),
+      fill = guide_legend(order = 1)
+    ) +
+    scale_colour_gradientn(colours = terrain.colors(10))
+}
 
 
 
