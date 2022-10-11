@@ -16,6 +16,79 @@ library(pheatmap)
 ```
 
 
+```{r}
+full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
+  gene = col_character(),
+  accession = col_character(),
+  length = col_double(),
+  ipas = col_character(),
+  description = col_character(),
+  disease = col_character(),
+  subtype = col_character(),
+  note = col_character(),
+  tce_mscnt = col_double(),
+  tce_mslen = col_double(),
+  tce_nsaf = col_double(),
+  media_mscnt = col_double(),
+  media_mslen = col_double(),
+  media_nsaf = col_double(),
+  media_ratio = col_double(),
+  surface_mscnt = col_double(),
+  surface_mslen = col_double(),
+  surface_nsaf = col_double(),
+  surface_ratio = col_double(),
+  nuclear_mscnt = col_double(),
+  nuclear_mslen = col_double(),
+  nuclear_nsaf = col_double(),
+  nuclear_ratio = col_double(),
+  tee_mscnt = col_double(),
+  tee_mslen = col_double(),
+  tee_nsaf = col_double(),
+  exosurface_mscnt = col_double(),
+  exosurface_mslen = col_double(),
+  exosurface_nsaf = col_double(),
+  exosurface_ratio = col_double()
+  )
+)
+```
+
+
+# create annotation for IPAS
+```{r}
+IPAS_annotation <- full_rawdata %>% select(ipas, disease, subtype) %>% unique() %>% arrange(disease, subtype)
+```
+
+```{r}
+table(IPAS_annotation$disease)
+```
+
+
+
+
+
+# create raw data for each component
+```{r}
+raw_count_tce <- full_rawdata %>% 
+   select(accession, ipas, tce_mscnt) %>%
+   filter(ipas %in% IPAS_in_TCE) %>%
+   filter(accession %in% missing_protein_df$Accession) %>% 
+   pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
+   replace(is.na(.), 0)
+
+raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
+rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
+raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) = 0, ]
+raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) == 0]
+ncol(raw_count_tce_mat)
+nrow(raw_count_tce_mat)
+```
+
+```{r}
+boxplot(raw_count_tce_mat)
+```
+
+
+
 # Reading data
 ```{r}
 SpC_TCE <- read.delim("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
@@ -26,6 +99,28 @@ SpC_nuclear <- read.delim("data/CellLineCompartment_Nuclear_SumTickNormalization
 SpCs <- list(TCE=SpC_TCE, surface=SpC_surface, exosome=SpC_exosome, media=SpC_media, nuclear=SpC_nuclear)
 ```
 
+
+# extract IPAS number
+```{r}
+extract_IPAS <- function(matrix) {
+  str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
+}
+```
+
+
+```{r}
+IPAS_list <- lapply(SpCs, extract_IPAS)
+# for(i in seq(1, 300, 50)) {
+#   print(paste0(IPAS_list[i:(i+50)], collapse = ', '))
+# }
+
+```
+
+
+
+```{r}
+sort(IPAS_list)
+```
 
 
 ```{r}
@@ -109,7 +204,7 @@ replicates_for_removing$TCE <- c(replicates_for_removing$TCE, 'Prostate.IP0872_1
 
 
 ```{r}
-SpC_lists <- mapply(SpC_List, SpCs, annotations, replicates_remove=replicates_for_removing, MoreArgs = list(NA_substitution=NULL, proteins_filter=missing_protein_df$Accession), SIMPLIFY = FALSE)
+SpC_lists <- mapply(SpC_List, SpCs, annotations, replicates_remove=replicates_for_removing, MoreArgs = list(NA_substitution=0, proteins_filter=missing_protein_df$Accession), SIMPLIFY = FALSE)
 ```
 
 
@@ -130,10 +225,9 @@ Since the data is normalized not raw data, not use a pre-filter here
 ```{r}
 prefilter <- function(x, count_threshold) {
   N <- min(table(x$annotation$disease))
-  keep <- rowSums(x$matrix > 1, na.rm = T) >= N
+  keep <- rowSums(x$matrix > 0, na.rm = T) >= N
   return(rownames(x$matrix[keep,]))
 }
-
 
 # get MPs 
 MPs <- lapply(SpC_lists, prefilter)
@@ -251,6 +345,19 @@ mapping_to_entrez <- function(proteins) {
 ```
 
 
+biomaRt didn't do good in conversion from gene symbol to ENTREZID
+<!-- https://bioconductor.org/packages/release/bioc/vignettes/biomaRt/inst/doc/accessing_ensembl.html -->
+<!-- ```{r} -->
+<!-- library('biomaRt') -->
+<!-- MPs_gene <- df[MPs$TCE, ] -->
+
+<!-- mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl")) -->
+<!-- dict <- getBM(filters= "hgnc_symbol", attributes= c("entrezgene_id", "hgnc_symbol"), values=MPs_gene, mart= mart) -->
+<!-- dict_by_ensembl <- as.data.frame(x=dict$hgnc_symbol, row.names = dict$ensembl_gene_id) -->
+<!-- ``` -->
+
+
+
 ```{r}
 MPs_entrez <- lapply(MPs, mapping_to_entrez)
 GOs <- lapply(MPs_entrez, goana, species = 'Hs')
@@ -301,13 +408,6 @@ plts
 ```{r}
 read.csv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
 ```
-
-
-
-
-
-
-
 
 
 

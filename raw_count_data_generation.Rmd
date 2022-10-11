@@ -1,0 +1,91 @@
+---
+title: "raw_count_data_generation"
+output: html_document
+date: "2022-10-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+# import raw data file
+```{r}
+full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
+  gene = col_character(),
+  accession = col_character(),
+  length = col_double(),
+  ipas = col_character(),
+  description = col_character(),
+  disease = col_character(),
+  subtype = col_character(),
+  note = col_character(),
+  tce_mscnt = col_double(),
+  tce_mslen = col_double(),
+  tce_nsaf = col_double(),
+  media_mscnt = col_double(),
+  media_mslen = col_double(),
+  media_nsaf = col_double(),
+  media_ratio = col_double(),
+  surface_mscnt = col_double(),
+  surface_mslen = col_double(),
+  surface_nsaf = col_double(),
+  surface_ratio = col_double(),
+  nuclear_mscnt = col_double(),
+  nuclear_mslen = col_double(),
+  nuclear_nsaf = col_double(),
+  nuclear_ratio = col_double(),
+  tee_mscnt = col_double(),
+  tee_mslen = col_double(),
+  tee_nsaf = col_double(),
+  exosurface_mscnt = col_double(),
+  exosurface_mslen = col_double(),
+  exosurface_nsaf = col_double(),
+  exosurface_ratio = col_double()
+  )
+)
+```
+
+# import experiment meta data for samples
+```{r}
+# experiment_metadata <- readxl::read_xlsx('data/sample_experiment_metadata.xlsx', 
+#                                          sheet = 'Sheet1', 
+#                                          skip = 2,
+#                                          col_names = c('ipas', 'description', 'type', 'organism', 'disease', 'subtype', 'note',
+#                                                        'S',	'N',	'S',	'N',	 'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',
+#                                                        'issue', 'mysql', 'mongo'))
+# 
+# cell_line <- experiment_metadata %>% filter(type == 'Cell Line', mysql == '1701') %>% select(ipas) %>% pull
+```
+
+
+```{r}
+raw_count_tce <- full_rawdata %>% 
+   select(accession, ipas, tce_mscnt) %>%
+   filter(ipas %in% IPAS_list$TCE) %>%
+   pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
+   replace(is.na(.), 0)
+```
+
+
+```{r}
+raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
+rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
+raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) > 0, ]
+raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) > 0 ]
+ncol(raw_count_tce_mat)
+nrow(raw_count_tce_mat)
+```
+
+
+```{r}
+
+```
+

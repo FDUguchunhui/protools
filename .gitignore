@@ -40,7 +40,8 @@ vignettes/*.pdf
 .Renviron
 
 # all data files
-data/*
-output/*
+data/
+output/
 
 .DS_Store
+cache/

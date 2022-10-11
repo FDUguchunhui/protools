@@ -8,7 +8,7 @@
 #' @param log_scale
 #' @param row_keep
 #' @param show_rownames 
-#' @param show_colnames, show_colnames, cluster_cols, cluster_rows, ... pheatmap 
+#' @param show_colnames, show_colnames, cluster_cols, cluster_rows, ... pheatmap
 #' parameters that will be used when calling pheatmap function
 
 

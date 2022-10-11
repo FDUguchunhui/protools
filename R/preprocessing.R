@@ -63,3 +63,54 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
   # class(return_lst) <- 'SpC_list'
   return(out)
 }
+
+
+
+#' @export
+#' @title 
+#' @description 
+#' @param x a matrix of raw counts with a gene id in as row name
+#' @param length a data.frame that contains information about gene length for 
+#' @param per_count 
+#' @param na_fill the values used to fill if NA is encountered. Can be a scalar
+#' for all NA or a vector which values will be sequentially filled into NA positions
+#' each gene represented by the gene id in each row 
+#' @return the TPM normalized matrix in the same shape as x
+#' @references 
+#' # https://www.youtube.com/watch?v=TTUrtCY2k-w&t=548s
+#  https://www.biostars.org/p/335187/
+TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
+  if(!is.null(na_fill)) {
+    x[is.na(x)] = na_fill
+  }
+  # reorder the gene id and gene length information as the same in x
+  len <-  gene_length[rownames(x), ]
+  x <- sweep(x, 1, len, FUN = '/')
+  # divide cells in each row by the corresponding total RPK of the replicate it belongs to
+  return(t(t(x) * per_count/colSums(x)))
+}
+
+
+
+#' @export
+#' @title Calculate Normalized Spectral Abundance Factor (NASF)
+#' @description NSAF_j = (Sc_j/len)/sum(Sc_i/len for all proteins)
+#' @param x a matrix of raw counts
+#' @param protein_length a data.frame that contains information about gene length for 
+#' each gene represented by protein id in each row 
+#' @return the NASF normalized matrix in the same shape as x
+#' @references 
+#' https://github.com/moldach/proteomics-spectralCount-normalization/blob/master/nsaf.R
+#' 
+#' McIlwain S, Mathews M, Bereman MS, Rubel EW, MacCoss MJ, Noble WS. 
+#' Estimating relative abundances of proteins from shotgun proteomics data. 
+#' BMC Bioinformatics. 2012 Nov 19;13:308. doi: 10.1186/1471-2105-13-308. PMID: 23164367; PMCID: PMC3599300.
+nasf <- function(x, protein_length, per_count, na_fill=NULL) {
+  # reorder the gene id and gene length information as the same in x
+  TPM(x, protein_length, per_count = per_count, na_fill = na_fill)
+}
+
+
+
+
+
