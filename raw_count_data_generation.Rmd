@@ -55,37 +55,206 @@ full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
 
 # import experiment meta data for samples
 ```{r}
-# experiment_metadata <- readxl::read_xlsx('data/sample_experiment_metadata.xlsx', 
-#                                          sheet = 'Sheet1', 
-#                                          skip = 2,
-#                                          col_names = c('ipas', 'description', 'type', 'organism', 'disease', 'subtype', 'note',
-#                                                        'S',	'N',	'S',	'N',	 'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',
-#                                                        'issue', 'mysql', 'mongo'))
-# 
-# cell_line <- experiment_metadata %>% filter(type == 'Cell Line', mysql == '1701') %>% select(ipas) %>% pull
+experiment_metadata <- readxl::read_xlsx('data/sample_experiment_metadata.xlsx',
+                                         sheet = 'Sheet1',
+                                         skip = 2,
+                                         col_names = c('ipas', 'description', 'type', 'organism', 'disease', 'subtype', 'note',
+                                                       'S',	'N',	'S',	'N',	 'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',
+                                                       'issue', 'mysql', 'mongo'))
+
+cell_line <- experiment_metadata %>% filter(type == 'Cell Line', mysql == '1701') %>% select(ipas) %>%  pull %>% sort()
+```
+
+
+
+```{r}
+sort(unique(full_rawdata$ipas))
+```
+
+
+# import normalized data
+```{r}
+SpC_TCE <- read.delim("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
+SpC_surface <- read.delim("data/CellLineCompartment_Surface_SumTickNormalization.tsv",  sep = '\t', skip=2, row.names = 'Accession')
+SpC_exosome <- read.csv("data/CellLineCompartment_Exosome_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_media <- read.csv("data/CellLineCompartment_Media_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_nuclear <- read.delim("data/CellLineCompartment_Nuclear_SumTickNormalization.csv", sep = '\t', skip=2, row.names = 'Accession')
+SpCs <- list(TCE=SpC_TCE, surface=SpC_surface, exosome=SpC_exosome, media=SpC_media, nuclear=SpC_nuclear)
+```
+
+
+# extract IPAS numbers in each component dataset
+```{r}
+extract_IPAS <- function(matrix) {
+  str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
+}
+
+IPAS_list <- lapply(SpCs, extract_IPAS)
+# for(i in seq(1, 300, 50)) {
+#   print(paste0(IPAS_list[i:(i+50)], collapse = ', '))
+# }
+
 ```
 
 
 ```{r}
-raw_count_tce <- full_rawdata %>% 
-   select(accession, ipas, tce_mscnt) %>%
-   filter(ipas %in% IPAS_list$TCE) %>%
-   pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
+generating_raw_count <- function(IPAS, count_column) {
+  raw_count <- full_rawdata %>% 
+   select(accession, ipas, !!count_column) %>%
+   filter(ipas %in% IPAS) %>%
+   pivot_wider(names_from = ipas, values_from = !!count_column) %>% 
    replace(is.na(.), 0)
+
+  raw_count_mat <- as.matrix(raw_count[-1])
+  rownames(raw_count_mat) <- pull(raw_count[1])
+  raw_count_mat <- raw_count_mat[rowSums(raw_count_mat) > 0, ]
+  raw_count_mat <- raw_count_mat[, colSums(raw_count_mat) > 0 ]
+  
+  cat(count_column, ': ',
+      'number of col', ncol(raw_count_mat), '\n',
+      'number of row', nrow(raw_count_mat), '\n')
+  
+  return(raw_count_mat)
+}
+
+# example
+# generating_raw_count(IPAS_list$TCE, count_column = 'tce_mscnt')
+```
+
+
+
+```{r}
+raw_count_mats <- mapply(generating_raw_count, IPAS_list[-which(names(IPAS_list) == 'exosome')], c('tce_mscnt', 'surface_mscnt', 'media_mscnt', 'nuclear_mscnt'))
+```
+# check overlap
+```{r}
+IPAS_list$TCE[which(!IPAS_list$TCE %in% unique(full_rawdata$ipas))]
+IPAS_list$surface[which(!IPAS_list$surface %in% unique(full_rawdata$ipas))]
+IPAS_list$media[which(!IPAS_list$media %in% unique(full_rawdata$ipas))]
+IPAS_list$nuclear[which(!IPAS_list$nuclear %in% unique(full_rawdata$ipas))]
 ```
 
 
 ```{r}
-raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
-rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
-raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) > 0, ]
-raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) > 0 ]
-ncol(raw_count_tce_mat)
-nrow(raw_count_tce_mat)
+# head(raw_count_mats$TCE)
+```
+
+# check distribution !take long time to run
+```{r}
+# boxplot(as.data.frame(raw_count_mats$TCE))
+```
+
+
+# sort column by column names
+```{r}
+sort_by_column <- function(mat) {
+  return(mat[, sort(colnames(mat))])
+}
+
+raw_count_mats <- lapply(raw_count_mats, sort_by_column)
+
+# raw_count_mats$TCE <- raw_count_mats$TCE[ ,sort(colnames(raw_count_mats$TCE))]
+```
+
+
+# Approach 1
+# combine isoforms by summing them
+```{r}
+# rownames(raw_count_mats$TCE) <- str_extract(rownames(raw_count_mats$TCE), pattern = '[^-]+')
+
+
+combine_isoforms <- function(mat) {
+  tbl <- mat %>% as_tibble(rownames = 'accession') %>% 
+    mutate(accession=str_extract(accession, pattern = '[^-]+')) %>%
+    group_by(accession) %>% 
+    summarise_all(sum)
+  
+  out <- as.matrix(tbl[-1])
+  # need to use pull to make it as vector
+  rownames(out) <- pull(tbl[1])
+  return(out)
+}
+
+# combine_isoforms(raw_count_mats$TCE)
+
+raw_count_mats_iso_combined <- lapply(raw_count_mats, combine_isoforms)
+
+```
+
+
+# Approach 2
+# only keep canonical form (recommended by Jennifer) to avoid double-count
+```{r}
+remove_isoforms <- function(mat) {
+  tbl <- mat %>% as_tibble(rownames = 'accession') %>% 
+    mutate('is_isoform'=str_detect(accession, pattern = '.+-.+')) %>% 
+    filter(is_isoform == FALSE) %>% 
+    select(-c('is_isoform'))
+  
+  out <- as.matrix(tbl[-1])
+  # need to use pull to make it as vector
+  rownames(out) <- pull(tbl[1])
+  return(out)
+}
+
+raw_count_mats_iso_removed <- lapply(raw_count_mats, remove_isoforms)
+```
+
+
+# export raw count data
+```{r}
+# helper function write data to provided path
+write_to_csv <- function(mat, path) {
+  write.csv(as.data.frame(mat, row.names = rownames(mat)), path)
+}
+
+write_to_csv(raw_count_mats_iso_removed$TCE, 'data/cell line raw data/tce_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$surface, 'data/cell line raw data/surface_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$media, 'data/cell line raw data/media_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$nuclear, 'data/cell line raw data/nuclear_raw_count.csv')
+```
+
+
+# import omics metadata
+```{r}
+omics_metadata <- read_csv('data/omics_metadata.csv')
+protein_length <- omics_metadata %>% select(accession_id, protein_length) %>% unique() %>% na.omit()
+protein_length_df <- data.frame(length=protein_length$protein_length, row.names = protein_length$accession_id)
 ```
 
 
 ```{r}
+nasf_mat <- lapply(raw_count_mats_iso_removed, nasf, protein_length=protein_length_df, per_count=10e6)
+```
 
+
+# export nasf data
+```{r}
+write_to_csv(nasf_mat$TCE, 'data/cell line raw data/nasf_tce.csv')
+write_to_csv(nasf_mat$surface, 'data/cell line raw data/nasf_surface.csv')
+write_to_csv(nasf_mat$media, 'data/cell line raw data/nasf_media.csv')
+write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear.csv')
+```
+
+
+
+# filter with missing proteins
+```{r}
+missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- missing_protein_df[-c(1:12), ]
+```
+
+
+
+```{r}
+nasf_mat_missing_protein <- lapply(nasf_mat, SpC_List, annotation=NULL, NA_substitution = NULL, proteins_filter = missing_protein_df$Accession)
+```
+
+# export nasf data with only missing protein
+```{r}
+write_to_csv(nasf_mat_missing_protein$TCE$matrix, 'data/nasf/nasf_tce_missing_protein.csv')
+write_to_csv(nasf_mat_missing_protein$surface$matrix, 'data/nasf/nasf_surface_misisng_protein.csv')
+write_to_csv(nasf_mat_missing_protein$media$matrix, 'data/nasf/nasf_media_misisng_protein.csv')
+write_to_csv(nasf_mat_missing_protein$nuclear$matrix, 'data/nasf/nasf_nuclear_misisng_protein.csv')
 ```
 

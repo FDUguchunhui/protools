@@ -96,8 +96,8 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 #' @title Calculate Normalized Spectral Abundance Factor (NASF)
 #' @description NSAF_j = (Sc_j/len)/sum(Sc_i/len for all proteins)
 #' @param x a matrix of raw counts
-#' @param protein_length a data.frame that contains information about gene length for 
-#' each gene represented by protein id in each row 
+#' @param protein_length a data.frame that contains information about protein length for 
+#' each protein represented by protein id in each row 
 #' @return the NASF normalized matrix in the same shape as x
 #' @references 
 #' https://github.com/moldach/proteomics-spectralCount-normalization/blob/master/nsaf.R

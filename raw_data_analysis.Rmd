@@ -65,6 +65,7 @@ load('cache/dict_ensemble_to_symbol.rda')
 omics_metadata <- dict_ensembl_to_symbol %>% full_join(accession_metadata, by = c('hgnc_symbol'='gene')) %>% select(-c(start_position, end_position)) %>% select(accession, hgnc_symbol, ensembl_gene_id, gene_length, length)
 colnames(omics_metadata) <- c('accession_id', 'gene_symbol', 'ensembl_gene_id', 'gene_length', 'protein_length')
 head(omics_metadata)
+write_csv(omics_metadata, file = 'data/omics_metadata.csv')
 ```
 
 ```{r}

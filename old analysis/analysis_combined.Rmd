@@ -1,0 +1,419 @@
+---
+title: "analysis_combined"
+output: html_document
+date: "2022-09-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(DEqMS)
+library(tidyverse)
+library(pheatmap)
+```
+
+
+```{r}
+full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
+  gene = col_character(),
+  accession = col_character(),
+  length = col_double(),
+  ipas = col_character(),
+  description = col_character(),
+  disease = col_character(),
+  subtype = col_character(),
+  note = col_character(),
+  tce_mscnt = col_double(),
+  tce_mslen = col_double(),
+  tce_nsaf = col_double(),
+  media_mscnt = col_double(),
+  media_mslen = col_double(),
+  media_nsaf = col_double(),
+  media_ratio = col_double(),
+  surface_mscnt = col_double(),
+  surface_mslen = col_double(),
+  surface_nsaf = col_double(),
+  surface_ratio = col_double(),
+  nuclear_mscnt = col_double(),
+  nuclear_mslen = col_double(),
+  nuclear_nsaf = col_double(),
+  nuclear_ratio = col_double(),
+  tee_mscnt = col_double(),
+  tee_mslen = col_double(),
+  tee_nsaf = col_double(),
+  exosurface_mscnt = col_double(),
+  exosurface_mslen = col_double(),
+  exosurface_nsaf = col_double(),
+  exosurface_ratio = col_double()
+  )
+)
+```
+
+
+# create annotation for IPAS
+```{r}
+IPAS_annotation <- full_rawdata %>% select(ipas, disease, subtype) %>% unique() %>% arrange(disease, subtype)
+```
+
+```{r}
+table(IPAS_annotation$disease)
+```
+
+
+
+
+
+# create raw data for each component
+```{r}
+raw_count_tce <- full_rawdata %>% 
+   select(accession, ipas, tce_mscnt) %>%
+   filter(ipas %in% IPAS_in_TCE) %>%
+   filter(accession %in% missing_protein_df$Accession) %>% 
+   pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
+   replace(is.na(.), 0)
+
+raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
+rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
+raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) = 0, ]
+raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) == 0]
+ncol(raw_count_tce_mat)
+nrow(raw_count_tce_mat)
+```
+
+```{r}
+boxplot(raw_count_tce_mat)
+```
+
+
+
+# Reading data
+```{r}
+SpC_TCE <- read.delim("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
+SpC_surface <- read.delim("data/CellLineCompartment_Surface_SumTickNormalization.tsv",  sep = '\t', skip=2, row.names = 'Accession')
+SpC_exosome <- read.csv("data/CellLineCompartment_Exosome_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_media <- read.csv("data/CellLineCompartment_Media_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_nuclear <- read.delim("data/CellLineCompartment_Nuclear_SumTickNormalization.csv", sep = '\t', skip=2, row.names = 'Accession')
+SpCs <- list(TCE=SpC_TCE, surface=SpC_surface, exosome=SpC_exosome, media=SpC_media, nuclear=SpC_nuclear)
+```
+
+
+# extract IPAS number
+```{r}
+extract_IPAS <- function(matrix) {
+  str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
+}
+```
+
+
+```{r}
+IPAS_list <- lapply(SpCs, extract_IPAS)
+# for(i in seq(1, 300, 50)) {
+#   print(paste0(IPAS_list[i:(i+50)], collapse = ', '))
+# }
+
+```
+
+
+
+```{r}
+sort(IPAS_list)
+```
+
+
+```{r}
+row_not_all_missing <- function(X) {
+  # X[X == 0] <-  NA
+  is_missing <- is.na(X)
+  row_keep <- (rowSums(is_missing) != ncol(X))
+  return(rownames(X)[row_keep])
+}
+
+MPs_in_components <- lapply(SpCs, row_not_all_missing)
+```
+
+
+## create column annotation
+```{r}
+extract_annotation <- function(SpC) {
+  disease_fulltype <- str_extract(colnames(SpC), '.+(?=\\.IP)')
+  disease <- disease_fulltype
+  disease[str_detect(disease_fulltype, 'Breast')] <- 'Breast'
+  disease[str_detect(disease_fulltype, 'Leukemia')] <- 'Leukemia'
+  IPAS_annotation <- data.frame(disease = disease, row.names = colnames(SpC))
+}
+
+annotations <- lapply(SpCs, extract_annotation)
+```
+
+## read-in newest missing protein list
+```{r}
+missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- missing_protein_df[-c(1:12), ]
+# head(missing_protein_df)
+```
+
+
+
+# analysis
+integrate information to create SpC_list objects in a list
+```{r}
+SpC_lists <- mapply(SpC_List, SpCs, annotations, MoreArgs = list(NA_substitution = NULL, proteins_filter = missing_protein_df$Accession), SIMPLIFY = FALSE)
+```
+
+## check cancer type distribution
+The minority group in different component dataset is different, if I collapse minorities in each of the
+dataset into "other", the group "other" is not comparable between dataset.
+So, I prefer just remove minority groups in each components dataset by a rule of minimum 3
+
+TCE: neuroblastoma (2) lymphoblast(2) 
+SurfaceL neuroblastoma (2) 
+exsome: NSCLC (1)
+media: Leukemia (1) neuroblastoma (2)
+nuclear: Ovarian (2)
+```{r}
+basic_describe(SpC_lists$TCE, plot_boxplot = FALSE, piechart_main = 'Total cell extraction (TCE)')
+par(mar=c(0.5, 0.5, 1, 1.6), mfrow=c(2, 2))
+mapply(function(x, title) {basic_describe(x, plot_boxplot=FALSE, piechart_main = title)}, x=SpC_lists[-1], title=names(SpC_lists[-1]))
+```
+
+
+```{r}
+par(mar=c(1, 1, 1, 1.6), mfrow=c(2, 3))
+mapply(function(x, title) {basic_describe(x, plot_piechart=FALSE, boxplot_main = title)}, x=SpC_lists, title=names(SpC_lists))
+```
+
+
+
+Remove the minority cancer type from each dataset
+```{r}
+extract_sample_id <- function(x, disease) {
+  rownames(x$annotation[x$annotation$disease %in% disease, ,drop=FALSE])
+}
+
+minority_diseases <- list(TCE=c('Neuroblastoma', 'Lymphoblast'),
+                          surface=c('Neuroblastoma'),
+                          exosome=c('NSCLC'),
+                          media=c('Neuroblastoma', 'Leukemia'),
+                          nuclear=c('Ovarian'))
+replicates_for_removing <- mapply(extract_sample_id, SpC_lists, minority_diseases, SIMPLIFY = FALSE)
+replicates_for_removing$TCE <- c(replicates_for_removing$TCE, 'Prostate.IP0872_1701.H660')
+```
+
+
+```{r}
+SpC_lists <- mapply(SpC_List, SpCs, annotations, replicates_remove=replicates_for_removing, MoreArgs = list(NA_substitution=0, proteins_filter=missing_protein_df$Accession), SIMPLIFY = FALSE)
+```
+
+
+```{r}
+par(omr=c(0.5, 0.5, 0.5, 1), mar=c(1, 4, 1, 4), mfrow=c(1, 2))
+basic_describe(SpC_lists$TCE, piechart_main = 'Total cell extraction (TCE)')
+par(mar=c(0.5, 0.5, 1, 1.6), mfrow=c(2, 2))
+mapply(function(x, title) {basic_describe(x, pie_boxplot=FALSE, boxplot_main = title, piechart_main = title)}, x=SpC_lists[-1], title=names(SpC_lists[-1]))
+```
+
+
+# Section 1: Missing proteins localization
+
+
+# Data pre-filter
+Since the data is normalized not raw data, not use a pre-filter here
+<!-- remove proteins that is not confidentially detected -->
+```{r}
+prefilter <- function(x, count_threshold) {
+  N <- min(table(x$annotation$disease))
+  keep <- rowSums(x$matrix > 0, na.rm = T) >= N
+  return(rownames(x$matrix[keep,]))
+}
+
+# get MPs 
+MPs <- lapply(SpC_lists, prefilter)
+sapply(MPs, length)
+
+
+# compare with number of MPs before pre-filtering 
+MPs_before_filter <- lapply(SpC_lists, function(x) {return(rownames(x$matrix))})
+sapply(MPs_before_filter, length)
+```
+
+
+```{r}
+library(VennDiagram)
+library(RColorBrewer)
+myCol <- brewer.pal(4, "Pastel2")
+
+venn.diagram(
+        x = MPs[-1],
+        category.names = names(MPs[-1]),
+        filename = 'output/MPs_after_filter.png',
+        output=TRUE,
+        
+        main='Missing proteins after pre-filtering',
+        main.cex = 0.5,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 600 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .6,
+        fontface = "bold",
+        fontfamily = "sans",
+        
+                # Set names
+        cat.cex = 0.5,
+        cat.fontface = "bold",
+        cat.default.pos = "outer"
+)
+```
+
+```{r}
+myCol <- brewer.pal(4, "Pastel2")
+
+venn.diagram(
+        x = MPs_in_components[-3],
+        category.names = names(MPs_in_components[-3]),
+        filename = 'output/MPs_before_filter.png',
+        output=TRUE,
+        
+        main='Missing proteins before pre-filtering',
+        main.cex = 0.5,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 600 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .6,
+        fontface = "bold",
+        fontfamily = "sans",
+        
+                # Set names
+        cat.cex = 0.5,
+        cat.fontface = "bold",
+        cat.default.pos = "outer",
+)
+```
+
+
+# Gene Oncology analysis
+Not using GSEA because the it require fold-change of DEGs and the we are only infer
+a DEGs based on DEPs so the fold-change of genes is not available
+The reason for not run pathway analysis is the same, current data can only used for a
+crude analysis
+```{r}
+missing_protein_df
+```
+
+
+```{r}
+df <- missing_protein_df %>% dplyr::select(Accession, `gene name(s)`) 
+df <- base::data.frame(gene_name = df$`gene name(s)`, row.names = df$Accession)
+```
+
+
+```{r}
+library(org.Hs.eg.db)
+
+mapping_to_entrez <- function(proteins) {
+  gene_names <- df[proteins,]
+  entrez_id <- AnnotationDbi::select(org.Hs.eg.db, gene_names, keytype = "SYMBOL", columns=c("ENTREZID", "UNIPROT"))$ENTREZID
+  return(entrez_id)
+}
+
+# uniprots <- MPs$surface
+# gene_names <- df[uniprots,]
+```
+
+
+biomaRt didn't do good in conversion from gene symbol to ENTREZID
+<!-- https://bioconductor.org/packages/release/bioc/vignettes/biomaRt/inst/doc/accessing_ensembl.html -->
+<!-- ```{r} -->
+<!-- library('biomaRt') -->
+<!-- MPs_gene <- df[MPs$TCE, ] -->
+
+<!-- mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl")) -->
+<!-- dict <- getBM(filters= "hgnc_symbol", attributes= c("entrezgene_id", "hgnc_symbol"), values=MPs_gene, mart= mart) -->
+<!-- dict_by_ensembl <- as.data.frame(x=dict$hgnc_symbol, row.names = dict$ensembl_gene_id) -->
+<!-- ``` -->
+
+
+
+```{r}
+MPs_entrez <- lapply(MPs, mapping_to_entrez)
+GOs <- lapply(MPs_entrez, goana, species = 'Hs')
+```
+
+
+```{r}
+top_GOs_BP <- lapply(GOs, topGO, number = 50, ontology='BP', truncate=30)
+top_GOs_CC <- lapply(GOs, topGO, number = 50, ontology='CC', truncate=30)
+top_GOs_MF <- lapply(GOs, topGO, number = 50, ontology='MF', truncate=30)
+```
+
+
+
+
+```{r}
+par(mfrow=c(2, 2))
+plot_venn_diagram(top_GOs_BP, main='Biology pathway top 50')
+plot_venn_diagram(top_GOs_CC, main='Cellular component top 50')
+plot_venn_diagram(top_GOs_MF, main='Molecular function top 50')
+```
+
+
+```{r}
+par(mfrow=c(3, 2))
+plts <- lapply(top_GOs_BP, bubble_plot)
+plts
+```
+
+
+```{r}
+par(mfrow=c(3, 2))
+plts <- lapply(top_GOs_CC, bubble_plot)
+plts
+```
+
+```{r}
+par(mfrow=c(3, 2))
+plts <- lapply(top_GOs_MF, bubble_plot)
+plts
+```
+
+
+
+
+
+# Section 1.2 cross-validation with RNA-seq data (correlation)
+```{r}
+read.csv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
+```
+
+
+
+# section 2: missing protein by cancer type
+```{r}
+res_lst <- one_vs_all_test(SpC_lists$TCE, method = 'Wilcoxon', logFC = 0, PAjusted = 1)
+```
+
+
