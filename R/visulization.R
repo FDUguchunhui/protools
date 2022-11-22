@@ -89,15 +89,12 @@ basic_describe <- function(x, boxplot_main='Distribution', piechart_main='Group'
 #' with a preset of parameters. It will output to R viewer instead of as a file
 #' @param x a list of character vectors whose overlappings you want to plot 
 #' @param main the tilte of the plot
-#' 
-plot_venn_diagram <- function(top_GOs, main='Title', ...) {
-  
-  pathways <- lapply(top_GOs, '[[', 'Term')
-  myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+plot_venn_diagram <- function(lists, main='Venn diagram', ...) {
+  myCol <- RColorBrewer::brewer.pal(length(lists), "Pastel2")
   
   venn <- VennDiagram::venn.diagram(
-    x = pathways[-3],
-    category.names = names(pathways[-3]),
+    x = lists,
+    category.names = names(lists),
     main=main,
     filename = NULL,
     
@@ -122,10 +119,28 @@ plot_venn_diagram <- function(top_GOs, main='Title', ...) {
     cat.cex = 2,
     cat.fontface = "bold",
     cat.default.pos = "outer",
+    disable.logging = TRUE,
     ...
   )
   grid::grid.newpage()
   grid::grid.draw(venn)
+}
+
+
+
+
+#' @export
+#' @title Custumorized Venn diagram plot
+#' @description This is wrapper function for VennDiagram::venn.diagram function
+#' with a preset of parameters. It will output to R viewer instead of as a file
+#' @param x a list of character vectors whose overlappings you want to plot 
+#' @param main the tilte of the plot
+#' 
+plot_venn_diagram_top_Go <- function(top_GOs, main='Title', ...) {
+  
+  pathways <- lapply(top_GOs, '[[', 'Term')
+  plot_venn_diagram(pathways, main=main, ...)
+  
 }
 
 

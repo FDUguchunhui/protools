@@ -26,7 +26,7 @@
 #' 
 #' 
 
-SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL, replicates_remove=NULL) {
+SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL, replicates_remove=NULL, replicates_keep=NULL) {
   SpC_matrix <- as.matrix(df)
   
   # if need to substitute NA 
@@ -49,6 +49,16 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
     before <- ncol(SpC_matrix)
     SpC_matrix <- SpC_matrix[ ,! (colnames(SpC_matrix) %in% replicates_remove)]
     annotation <- annotation[!(rownames(annotation) %in% replicates_remove), ,drop=FALSE]
+    after <- ncol(SpC_matrix)
+    message('Number of columns before filtering: ', before)
+    message('Number of columns after filtering: ', after)
+    message()
+  }
+  
+  if (!is.null(replicates_keep)) {
+    before <- ncol(SpC_matrix)
+    SpC_matrix <- SpC_matrix[ ,colnames(SpC_matrix) %in% replicates_keep]
+    annotation <- annotation[(rownames(annotation) %in% replicates_keep), ,drop=FALSE]
     after <- ncol(SpC_matrix)
     message('Number of columns before filtering: ', before)
     message('Number of columns after filtering: ', after)
@@ -105,7 +115,7 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 #' McIlwain S, Mathews M, Bereman MS, Rubel EW, MacCoss MJ, Noble WS. 
 #' Estimating relative abundances of proteins from shotgun proteomics data. 
 #' BMC Bioinformatics. 2012 Nov 19;13:308. doi: 10.1186/1471-2105-13-308. PMID: 23164367; PMCID: PMC3599300.
-nasf <- function(x, protein_length, per_count, na_fill=NULL) {
+nsaf <- function(x, protein_length, per_count, na_fill=NULL) {
   # reorder the gene id and gene length information as the same in x
   TPM(x, protein_length, per_count = per_count, na_fill = na_fill)
 }

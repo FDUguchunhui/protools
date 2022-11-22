@@ -17,49 +17,49 @@ library(pheatmap)
 
 
 ```{r}
-full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
-  gene = col_character(),
-  accession = col_character(),
-  length = col_double(),
-  ipas = col_character(),
-  description = col_character(),
-  disease = col_character(),
-  subtype = col_character(),
-  note = col_character(),
-  tce_mscnt = col_double(),
-  tce_mslen = col_double(),
-  tce_nsaf = col_double(),
-  media_mscnt = col_double(),
-  media_mslen = col_double(),
-  media_nsaf = col_double(),
-  media_ratio = col_double(),
-  surface_mscnt = col_double(),
-  surface_mslen = col_double(),
-  surface_nsaf = col_double(),
-  surface_ratio = col_double(),
-  nuclear_mscnt = col_double(),
-  nuclear_mslen = col_double(),
-  nuclear_nsaf = col_double(),
-  nuclear_ratio = col_double(),
-  tee_mscnt = col_double(),
-  tee_mslen = col_double(),
-  tee_nsaf = col_double(),
-  exosurface_mscnt = col_double(),
-  exosurface_mslen = col_double(),
-  exosurface_nsaf = col_double(),
-  exosurface_ratio = col_double()
-  )
-)
+# full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
+#   gene = col_character(),
+#   accession = col_character(),
+#   length = col_double(),
+#   ipas = col_character(),
+#   description = col_character(),
+#   disease = col_character(),
+#   subtype = col_character(),
+#   note = col_character(),
+#   tce_mscnt = col_double(),
+#   tce_mslen = col_double(),
+#   tce_nsaf = col_double(),
+#   media_mscnt = col_double(),
+#   media_mslen = col_double(),
+#   media_nsaf = col_double(),
+#   media_ratio = col_double(),
+#   surface_mscnt = col_double(),
+#   surface_mslen = col_double(),
+#   surface_nsaf = col_double(),
+#   surface_ratio = col_double(),
+#   nuclear_mscnt = col_double(),
+#   nuclear_mslen = col_double(),
+#   nuclear_nsaf = col_double(),
+#   nuclear_ratio = col_double(),
+#   tee_mscnt = col_double(),
+#   tee_mslen = col_double(),
+#   tee_nsaf = col_double(),
+#   exosurface_mscnt = col_double(),
+#   exosurface_mslen = col_double(),
+#   exosurface_nsaf = col_double(),
+#   exosurface_ratio = col_double()
+#   )
+# )
 ```
 
 
 # create annotation for IPAS
 ```{r}
-IPAS_annotation <- full_rawdata %>% select(ipas, disease, subtype) %>% unique() %>% arrange(disease, subtype)
+# IPAS_annotation <- full_rawdata %>% select(ipas, disease, subtype) %>% unique() %>% arrange(disease, subtype)
 ```
 
 ```{r}
-table(IPAS_annotation$disease)
+# table(IPAS_annotation$disease)
 ```
 
 
@@ -68,23 +68,23 @@ table(IPAS_annotation$disease)
 
 # create raw data for each component
 ```{r}
-raw_count_tce <- full_rawdata %>% 
-   select(accession, ipas, tce_mscnt) %>%
-   filter(ipas %in% IPAS_in_TCE) %>%
-   filter(accession %in% missing_protein_df$Accession) %>% 
-   pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
-   replace(is.na(.), 0)
-
-raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
-rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
-raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) = 0, ]
-raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) == 0]
-ncol(raw_count_tce_mat)
-nrow(raw_count_tce_mat)
+# raw_count_tce <- full_rawdata %>% 
+#    select(accession, ipas, tce_mscnt) %>%
+#    filter(ipas %in% IPAS_in_TCE) %>%
+#    filter(accession %in% missing_protein_df$Accession) %>% 
+#    pivot_wider(names_from = ipas, values_from = tce_mscnt) %>% 
+#    replace(is.na(.), 0)
+# 
+# raw_count_tce_mat <- as.matrix(raw_count_tce[-1])
+# rownames(raw_count_tce_mat) <- pull(raw_count_tce[1])
+# raw_count_tce_mat <- raw_count_tce_mat[rowSums(raw_count_tce_mat) = 0, ]
+# raw_count_tce_mat <- raw_count_tce_mat[, colSums(raw_count_tce_mat) == 0]
+# ncol(raw_count_tce_mat)
+# nrow(raw_count_tce_mat)
 ```
 
 ```{r}
-boxplot(raw_count_tce_mat)
+# boxplot(raw_count_tce_mat)
 ```
 
 
@@ -102,14 +102,14 @@ SpCs <- list(TCE=SpC_TCE, surface=SpC_surface, exosome=SpC_exosome, media=SpC_me
 
 # extract IPAS number
 ```{r}
-extract_IPAS <- function(matrix) {
-  str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
-}
+# extract_IPAS <- function(matrix) {
+#   str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
+# }
 ```
 
 
 ```{r}
-IPAS_list <- lapply(SpCs, extract_IPAS)
+# IPAS_list <- lapply(SpCs, extract_IPAS)
 # for(i in seq(1, 300, 50)) {
 #   print(paste0(IPAS_list[i:(i+50)], collapse = ', '))
 # }
@@ -119,19 +119,19 @@ IPAS_list <- lapply(SpCs, extract_IPAS)
 
 
 ```{r}
-sort(IPAS_list)
+# sort(IPAS_list)
 ```
 
 
 ```{r}
-row_not_all_missing <- function(X) {
-  # X[X == 0] <-  NA
-  is_missing <- is.na(X)
-  row_keep <- (rowSums(is_missing) != ncol(X))
-  return(rownames(X)[row_keep])
-}
-
-MPs_in_components <- lapply(SpCs, row_not_all_missing)
+# row_not_all_missing <- function(X) {
+#   # X[X == 0] <-  NA
+#   is_missing <- is.na(X)
+#   row_keep <- (rowSums(is_missing) != ncol(X))
+#   return(rownames(X)[row_keep])
+# }
+# 
+# MPs_in_components <- lapply(SpCs, row_not_all_missing)
 ```
 
 
@@ -150,7 +150,7 @@ annotations <- lapply(SpCs, extract_annotation)
 
 ## read-in newest missing protein list
 ```{r}
-missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- readxl::read_xlsx('data/support data/PE2-5.xlsx')
 missing_protein_df <- missing_protein_df[-c(1:12), ]
 # head(missing_protein_df)
 ```
@@ -246,9 +246,9 @@ library(RColorBrewer)
 myCol <- brewer.pal(4, "Pastel2")
 
 venn.diagram(
-        x = MPs[-1],
-        category.names = names(MPs[-1]),
-        filename = 'output/MPs_after_filter.png',
+        x = MPs[-3],
+        category.names = names(MPs[-3]),
+        filename = 'output/MPs_after_filter_old.png',
         output=TRUE,
         
         main='Missing proteins after pre-filtering',
@@ -282,9 +282,9 @@ venn.diagram(
 myCol <- brewer.pal(4, "Pastel2")
 
 venn.diagram(
-        x = MPs_in_components[-3],
-        category.names = names(MPs_in_components[-3]),
-        filename = 'output/MPs_before_filter.png',
+        x = MPs_before_filter[-3],
+        category.names = names(MPs_before_filter[-3]),
+        filename = 'output/MPs_before_filter_old.png',
         output=TRUE,
         
         main='Missing proteins before pre-filtering',
@@ -365,11 +365,16 @@ GOs <- lapply(MPs_entrez, goana, species = 'Hs')
 
 
 ```{r}
-top_GOs_BP <- lapply(GOs, topGO, number = 50, ontology='BP', truncate=30)
-top_GOs_CC <- lapply(GOs, topGO, number = 50, ontology='CC', truncate=30)
-top_GOs_MF <- lapply(GOs, topGO, number = 50, ontology='MF', truncate=30)
+top_GOs_BP <- lapply(GOs, topGO, number = 50, ontology='BP')
+top_GOs_CC <- lapply(GOs, topGO, number = 50, ontology='CC')
+top_GOs_MF <- lapply(GOs, topGO, number = 50, ontology='MF')
 ```
 
+
+# export GO analysis
+```{r}
+write_csv(top_GOs_BP$TCE, file = 'data/GO analysis/BP_tce_old.csv')
+```
 
 
 

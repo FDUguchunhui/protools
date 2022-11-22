@@ -17,71 +17,35 @@ library(tidyverse)
 
 # section 1 data processing
 ```{r}
-full_rawdata <- read_csv('data/nsaf_accession.csv', col_types = cols(
-  gene = col_character(),
-  accession = col_character(),
-  length = col_double(),
-  ipas = col_character(),
-  description = col_character(),
-  disease = col_character(),
-  subtype = col_character(),
-  note = col_character(),
-  tce_mscnt = col_double(),
-  tce_mslen = col_double(),
-  tce_nsaf = col_double(),
-  media_mscnt = col_double(),
-  media_mslen = col_double(),
-  media_nsaf = col_double(),
-  media_ratio = col_double(),
-  surface_mscnt = col_double(),
-  surface_mslen = col_double(),
-  surface_nsaf = col_double(),
-  surface_ratio = col_double(),
-  nuclear_mscnt = col_double(),
-  nuclear_mslen = col_double(),
-  nuclear_nsaf = col_double(),
-  nuclear_ratio = col_double(),
-  tee_mscnt = col_double(),
-  tee_mslen = col_double(),
-  tee_nsaf = col_double(),
-  exosurface_mscnt = col_double(),
-  exosurface_mslen = col_double(),
-  exosurface_nsaf = col_double(),
-  exosurface_ratio = col_double()
-  )
-)
+nasf_tce_tbl <- read.csv('data/cell line raw data/nasf_tce.csv', row.names = 1)
 ```
 
 
+IP0986_1701       Gastric
+IP0987_1701       Gastric
+IP0988_1701       Gastric
+IP0989_1701       Gastric
+IP0991_1701       Gastric
+IP0992_1701       Gastric
+IP7101_1701       Gastric
+IP7129_1701       Gastric
+IP7128_1701       Gastric
 ```{r}
-IPAS_in_RNA_Seq <- paste0(c('IP7103', 'IP0972', 'IP0995', 'IP0982', 'IP0999', 'IP7100', 'IP0993', 'IP0981', 'IP7105'), '_1701')
-dat <- full_rawdata %>% filter(ipas %in% IPAS_in_RNA_Seq) %>% select(gene, accession, length, ipas, disease, subtype, tce_mscnt, media_mscnt, surface_mscnt, nuclear_mscnt, exosurface_mscnt)
-dat
+gastric_cell_line <- c('IP0986_1701', 'IP0987_1701', 'IP0988_1701',
+  'IP0989_1701', 'IP0991_1701', 'IP0992_1701', 'IP7101_1701', 'IP7129_1701', 'IP7128_1701')
+tce_nasf <- nasf_tce_tbl %>% select(all_of(gastric_cell_line))
+tce_nasf_mat <- as.matrix(tce_nasf)
 ```
 
 ```{r}
-accession_metadata <- full_rawdata%>% select(gene, accession, length) %>% unique()
-load('cache/dict_ensemble_to_symbol.rda')
-omics_metadata <- dict_ensembl_to_symbol %>% full_join(accession_metadata, by = c('hgnc_symbol'='gene')) %>% select(-c(start_position, end_position)) %>% select(accession, hgnc_symbol, ensembl_gene_id, gene_length, length)
-colnames(omics_metadata) <- c('accession_id', 'gene_symbol', 'ensembl_gene_id', 'gene_length', 'protein_length')
-head(omics_metadata)
-write_csv(omics_metadata, file = 'data/omics_metadata.csv')
+omics_metadata <- read_csv('data/support data/omics_metadata.csv')
 ```
 
-```{r}
-(raw_data_tce <- dat %>% select(accession, ipas, tce_mscnt) %>% pivot_wider(names_from = ipas, values_from = tce_mscnt))
-```
-```{r}
-raw_data_tce_mat <- as.matrix(raw_data_tce[-1])
-rownames(raw_data_tce_mat) <- raw_data_tce$accession
-tce_nasf <- nasf(raw_data_tce_mat, data.frame(length=accession_metadata$length, row.names = accession_metadata$accession), per_count = 10e6, na_fill=0)
-head(tce_nasf)
-```
 
 ```{r}
 # accession_gene_symbol <- data.frame(gene_symbol = accession_metadata$gene,row.names = accession_metadata$accession)
 # rownames(tce_nasf) <- accession_gene_symbol[rownames(tce_nasf),]
-tce_nasf_gene_level <- rownames_mapping(tce_nasf, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
+tce_nasf_gene_level <- rownames_mapping(tce_nasf_mat, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
 # use sum or average? ?? sum seems to make more sense
 temp <- as_tibble(tce_nasf_gene_level, rownames='symbol') %>% group_by(symbol) %>% summarise_all(sum)
 tce_nasf_gene_level <- as.matrix(temp[-1])
@@ -100,13 +64,6 @@ colnames(count_TPM_gene_symbol) <- c('IP7103_1701', 'IP0972_1701', 'IP0995_1701'
 count_TPM_gene_symbol <- count_TPM_gene_symbol[, c('IP0993_1701', 'IP0995_1701', 'IP0999_1701', 'IP0972_1701', 'IP0981_1701', 'IP0982_1701', 'IP7103_1701', 'IP7105_1701', 'IP7100_1701')]
 head(count_TPM_gene_symbol)
 nrow(count_TPM_gene_symbol)
-```
-
-# remove IP0972_1701 for it doesn't have TCE data
-```{r}
-col_keep <- c('IP0993_1701', 'IP0995_1701', 'IP0999_1701', 'IP0981_1701', 'IP0982_1701', 'IP7103_1701', 'IP7105_1701', 'IP7100_1701')
-count_TPM_gene_symbol <- count_TPM_gene_symbol[, col_keep]
-tce_nasf_gene_level <- tce_nasf_gene_level[, col_keep]
 ```
 
 
@@ -164,6 +121,9 @@ pheatmap::pheatmap(log(count_nasf_both+1),
 # missing proteins
 check how many missing proteins is expressed in the 8 gastric sample in the protein data and in RNA-seq data  
 ```{r}
+missing_protein_df <- readxl::read_xlsx('data/support data/PE2-5.xlsx')
+missing_protein_df <- missing_protein_df[-c(1:12), ]
+
 mp_in_gene_symbol <- missing_protein_df$`gene name(s)`
 sum(rownames(tce_nasf_gene_level) %in% mp_in_gene_symbol)
 sum(both %in% mp_in_gene_symbol)
@@ -198,6 +158,14 @@ pheatmap::pheatmap(log(count_nasf_missing+1),
 # scatterplot
 ```{r}
 matplot(log(count_nasf_missing+1), log(count_TPM_missing+1))
+```
+
+
+```{r}
+y <- log(rowSums(count_nasf_missing)+1)
+x <- log(rowSums(count_TPM_missing)+1)
+plot(log(rowSums(count_nasf_missing)+1), log(rowSums(count_TPM_missing)+1))
+lm()
 ```
 
 

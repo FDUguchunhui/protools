@@ -44,7 +44,7 @@ count <- count[-which(rowSums(count[-1]) == 0),]
 import missing protein information
 ```{r}
 ## read-in newest missing protein list
-missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
+missing_protein_df <- readxl::read_xlsx('data/support data/PE2-5.xlsx')
 missing_protein_df <- missing_protein_df[-c(1:12), ]
 # head(missing_protein_df)
 accession_to_symbol <- missing_protein_df %>% dplyr::select(Accession, `gene name(s)`) 
@@ -109,9 +109,6 @@ dict_ensembl_to_symbol
 ```
 
 
-
-
-
 ## filtering unmapped ensemble gene id
 ```{r}
 count <- count %>% filter(Ensemble_ID %in% dict_ensembl_to_symbol$ensembl_gene_id)
@@ -135,8 +132,15 @@ gene_length_df <- dict_ensembl_to_symbol %>% dplyr::select(ensembl_gene_id, gene
 gene_length_df <- data.frame(length=gene_length_df$gene_length, row.names=gene_length_df$ensembl_gene_id)
 count_TPM_mat <- TPM(count_mat, gene_length_df)
 head(count_TPM_mat)
-save(count_TPM_mat, file='cache/count_TPM.rda')
+# save(count_TPM_mat, file='cache/count_TPM.rda')
 ```
+
+recheck sample-level expression distribution
+```{r}
+boxplot(as.data.frame(log(count_TPM_mat+1)))
+```
+
+
 
 
 Don't use TPM for differentially expression analysis: https://support.bioconductor.org/p/98820/#98875
@@ -144,6 +148,7 @@ The cutoff using raw count > 5 and TPM is actually similar: 0.848% of keep of re
 ```{r}
 keep <- rowSums(count_TPM_mat > 1, na.rm = T) >= ncol(count_TPM_mat)/2
 keep2 <-  rowSums(count_mat > 5, na.rm = T) >= ncol(count_mat)/2
+kk
 count_mat_filtered <- count_mat[keep,]
 # number of row before filtering 63920
 nrow(count_mat)
@@ -174,9 +179,9 @@ convert_accession_to_symbol <- function(protein_accessions) {
   return(accession_to_symbol[protein_accessions, ])
 }
 
-
-# 
-MPs_gene_symbols <- lapply(MPs, convert_accession_to_symbol)
+#
+load('cache/MPs_after_prefilter.rda')
+MPs_gene_symbols <- lapply(MPs_after_prefilter, convert_accession_to_symbol)
 ```
 
 
@@ -193,10 +198,16 @@ mean(MPs_has_trans_level_evidence %in% RNA_supported_MPs)
 
 
 
+
+
+
+
+##################################################
+Caution:the rest code is just used for checking overlapping between samples in TCE not just gastric cancer!!
 # !need also check just in gastric cancer TCE
 ```{r}
-mean(gene_names %in% RNA_supported_MPs)
-gene_names[gene_names %in% RNA_supported_MPs]
+# mean(gene_names %in% RNA_supported_MPs)
+# gene_names[gene_names %in% RNA_supported_MPs]
 ```
 
 
