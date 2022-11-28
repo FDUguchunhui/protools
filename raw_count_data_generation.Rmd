@@ -181,7 +181,7 @@ combine_isoforms <- function(mat) {
 
 # combine_isoforms(raw_count_mats$TCE)
 
-raw_count_mats_iso_combined <- lapply(raw_count_mats, combine_isoforms)
+# raw_count_mats_iso_combined <- lapply(raw_count_mats, combine_isoforms)
 
 ```
 
@@ -225,19 +225,23 @@ https://support.bioconductor.org/p/111608/
 
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 load('cache/count_TPM.rda')
 
 mart <- biomaRt::useDataset("hsapiens_gene_ensembl", biomaRt::useMart("ensembl"))
 dict_ensembl_to_symbol <- biomaRt::getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id","hgnc_symbol", "start_position","end_position"), values=rownames(count_TPM_mat), mart= mart)
 dict_ensembl_to_symbol$gene_length=dict_ensembl_to_symbol$end_position - dict_ensembl_to_symbol$start_position
 dict_ensembl_to_symbol[dict_ensembl_to_symbol == ''] <- NA
-# save(dict_ensembl_to_symbol, file='cache/dict_ensemble_to_symbol.rda')
-load('cache/dict_ensemble_to_symbol.rda')
-dict_ensembl_to_symbol
+save(dict_ensembl_to_symbol, file='cache/dict_ensemble_to_symbol.rda')
 ```
 
+
 ```{r}
+load('cache/dict_ensemble_to_symbol.rda')
+# dict_ensembl_to_symbol
+```
+
+```{r eval=FALSE, include=FALSE}
 accession_metadata <- full_rawdata %>% dplyr::select(gene, accession, length) %>% unique()
 load('cache/dict_ensemble_to_symbol.rda')
 omics_metadata <- dict_ensembl_to_symbol %>% full_join(accession_metadata, by = c('hgnc_symbol'='gene')) %>% dplyr::select(-c(start_position, end_position)) %>% dplyr::select(accession, hgnc_symbol, ensembl_gene_id, gene_length, length)
@@ -251,6 +255,11 @@ protein_length <- omics_metadata %>% dplyr::select(accession_id, protein_length)
 protein_length_df <- data.frame(length=protein_length$protein_length, row.names = protein_length$accession_id)
 save(protein_length_df, file = 'cache/protein_length.rda')
 ```
+```{r}
+load('cache/protein_length.rda')
+```
+
+
 
 
 ```{r}
@@ -265,6 +274,32 @@ write_to_csv(nasf_mat$surface, 'data/cell line raw data/nasf_surface.csv')
 write_to_csv(nasf_mat$media, 'data/cell line raw data/nasf_media.csv')
 write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear.csv')
 ```
+
+
+# only keep when count >= 2
+```{r}
+filter_greater_than_two <- function(count_mat) {
+  count_mat[count_mat <= 1] <- 0
+  return(count_mat)
+}
+
+raw_count_mats_iso_removed_2 <- lapply(raw_count_mats_iso_removed, filter_greater_than_two)
+mapply(write_to_csv, raw_count_mats_iso_removed_2, path=list('data/cell line raw data/tce_raw_count_2.csv', 
+                                                          'data/cell line raw data/surface_raw_count_2.csv',
+                                                          'data/cell line raw data/media_raw_count_2.csv',
+                                                          'data/cell line raw data/nuclear_raw_count_2.csv'))
+
+nasf_mat <- lapply(raw_count_mats_iso_removed_2, nsaf, protein_length=protein_length_df, per_count=10e6)
+
+write_to_csv(nasf_mat$TCE, 'data/cell line raw data/nasf_tce_2.csv')
+write_to_csv(nasf_mat$surface, 'data/cell line raw data/nasf_surface_2.csv')
+write_to_csv(nasf_mat$media, 'data/cell line raw data/nasf_media_2.csv')
+write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear_2.csv')
+```
+
+
+
+
 
 
 
@@ -308,6 +343,7 @@ gastric_primary_cell_count_mat <- generating_raw_count(IPAS = IPAS_in_RNA_Seq, c
 
 
 
+
 ```{r}
 gastric_primary_cell_nsaf_mat <- nsaf(gastric_primary_cell_count_mat, protein_length_df, per_count = 10e6, na_fill=0)
 gastric_primary_cell_nsaf_mat <- gastric_primary_cell_nsaf_mat[rowSums(gastric_primary_cell_nsaf_mat > 0) > 0, ]
@@ -323,3 +359,11 @@ write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_p
 
 
 
+# only keep count >= 2
+```{r}
+gastric_primary_cell_count_mat[gastric_primary_cell_count_mat <= 1] <- 0
+gastric_primary_cell_nsaf_mat <- nsaf(gastric_primary_cell_count_mat, protein_length_df, per_count = 10e6, na_fill=0)
+gastric_primary_cell_nsaf_mat <- gastric_primary_cell_nsaf_mat[rowSums(gastric_primary_cell_nsaf_mat > 0) > 0, ]
+write_to_csv(gastric_primary_cell_count_mat, 'data/gastric_primary_cell/gastric_primary_cell_count_2.csv')
+write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_primary_cell_nsaf_2.csv')
+```

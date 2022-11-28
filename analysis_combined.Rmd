@@ -44,6 +44,12 @@ annotations <- lapply(nasfs, create_annoataion, annotation_table=IPAS_annotation
 ```
 
 
+```{r}
+TCE_annotation <- annotations$TCE
+save(TCE_annotation, file = 'data/support data/TCE_annotation.rda')
+```
+
+
 integrate information to create SpC_list objects in a list
 ```{r}
 SpC_lists <- mapply(SpC_List, nasfs, annotations, SIMPLIFY = FALSE)

@@ -16,9 +16,55 @@ library(tidyverse)
 
 ```{r}
 gastric_nsaf <- as.matrix(read.csv('data/gastric_primary_cell/gastric_primary_cell_nsaf.csv', row.names = 1))
+gastric_count <- read_csv('data/gastric_primary_cell/gastric_primary_cell_count.csv')
+colnames(gastric_count)[1] <- 'accession'
 omics_metadata <- read_csv('data/support data/omics_metadata.csv', show_col_types = FALSE)
 load('cache/missing_protein.rda')
 ```
+# create missing protein only use P2-4
+# the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
+```{r}
+# missing_protein_df <- missing_protein_df %>% filter(PE == 'Evidence at transcript level')
+missing_proteins <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(`gene name(s)`) %>% pull
+P1_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
+
+missing_proteins_accession <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(Accession) %>% pull
+P1_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
+```
+
+# check the number of PSM for each proteins for missing and regular proteins
+```{r}
+MP_counts <- gastric_count %>% filter(accession %in% missing_proteins_accession)
+MP_counts_long <- MP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
+
+
+RP_counts <-  gastric_count %>% filter(!(accession %in% P1_5_proteins_accession))
+RP_counts_long <- RP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
+```
+
+
+```{r}
+MP_counts_long %>% ggplot(aes(x=count)) + 
+  geom_histogram()
+
+MP_counts_long %>% ggplot(aes(x=count)) + 
+  geom_histogram(breaks=seq(1, 10, 1)) +
+   scale_x_continuous(breaks = seq(1, 10, 1), lim = c(1, 10)) +
+  theme_classic()
+
+RP_counts_long %>% ggplot(aes(x=count)) + 
+  geom_histogram(breaks=seq(1, 300, 1))
+RP_counts_long %>% ggplot(aes(x=count)) + 
+  geom_histogram(breaks=seq(1, 10, 1)) +
+   scale_x_continuous(breaks = seq(1, 10, 1), lim = c(1, 10)) +
+  theme_classic()
+```
+
+
+```{r}
+
+```
+
 
 
 # aggregate into gene-level
@@ -135,13 +181,6 @@ summarize_by_case <- function(tbl, proteins_subset, negate=FALSE, remove_IPAS=NU
 table(missing_protein_df$PE)
 ```
 
-# create missing protein only use P2-4
-# the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
-```{r}
-# missing_protein_df <- missing_protein_df %>% filter(PE == 'Evidence at transcript level')
-missing_proteins <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(`gene name(s)`) %>% pull
-P1_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
-```
 
 # check missing proteins that are constant detected in several samples
 ```{r}
@@ -397,9 +436,7 @@ count_TPM_non_missing <- count_TPM_gene_symbol[!(rownames(count_TPM_gene_symbol)
 <!-- ``` -->
 
 # check paired correlation
-
 ```{r}
-
 A <- as_tibble(log(count_TPM_missing+1), rownames='accession') %>% pivot_longer(names_to = 'IPAS', values_to = 'TPM', cols = c(-accession))
 B <- as_tibble(log(count_nsaf_missing+1), rownames='accession') %>% pivot_longer(names_to = 'IPAS', values_to = 'NSAF', cols = c(-accession))
 glmm_dat_missing <- full_join(A, B, by=c('accession', 'IPAS')) %>% replace(is.na(.), 0) %>% filter(!(TPM == 0  & NSAF == 0))
