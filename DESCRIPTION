@@ -1,5 +1,5 @@
-Package: project
-Title: What the Package Does (One Line, Title Case)
+Package: protools
+Title: protools: proteomics data pre-processing and analysis
 Version: 0.0.0.9000
 Authors@R: 
     person("Chunhui", "Gu", email="chunhui.gu@uth.tmc.edu", role = c('aut', 'cre'))
@@ -11,3 +11,6 @@ RoxygenNote: 7.2.1
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Imports: 
+    lifecycle,
+    magrittr

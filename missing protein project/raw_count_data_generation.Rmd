@@ -1,0 +1,375 @@
+---
+title: "raw_count_data_generation"
+output: html_document
+date: "2022-10-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+# import raw data file
+```{r}
+full_rawdata <- read_csv('data/nsaf_accession_new.csv', col_types = cols(
+  gene = col_character(),
+  accession = col_character(),
+  length = col_double(),
+  ipas = col_character(),
+  description = col_character(),
+  disease = col_character(),
+  subtype = col_character(),
+  note = col_character(),
+  tce_mscnt = col_double(),
+  # tce_mslen = col_double(),
+  tce_nsaf = col_double(),
+  media_mscnt = col_double(),
+  # media_mslen = col_double(),
+  media_nsaf = col_double(),
+  media_ratio = col_double(),
+  surface_mscnt = col_double(),
+  # surface_mslen = col_double(),
+  surface_nsaf = col_double(),
+  surface_ratio = col_double(),
+  nuclear_mscnt = col_double(),
+  # nuclear_mslen = col_double(),
+  nuclear_nsaf = col_double(),
+  nuclear_ratio = col_double(),
+  tee_mscnt = col_double(),
+  # tee_mslen = col_double(),
+  tee_nsaf = col_double(),
+  # exosurface_mscnt = col_double(),
+  # exosurface_mslen = col_double(),
+  # exosurface_nsaf = col_double(),
+  # exosurface_ratio = col_double()
+  )
+)
+```
+
+# import experiment meta data for samples
+```{r}
+experiment_metadata <- readxl::read_xlsx('data/sample_experiment_metadata.xlsx',
+                                         sheet = 'Sheet1',
+                                         skip = 2,
+                                         col_names = c('ipas', 'description', 'type', 'organism', 'disease', 'subtype', 'note',
+                                                       'S',	'N',	'S',	'N',	 'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',	'S',	'N',
+                                                       'issue', 'mysql', 'mongo'))
+
+# cell_line <- experiment_metadata %>% filter(type == 'Cell Line', mysql == '1701') %>% select(ipas) %>%  pull %>% sort()
+```
+
+
+
+```{r}
+sort(unique(full_rawdata$ipas))
+```
+
+
+# import normalized data
+```{r}
+SpC_TCE <- read.delim("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
+```
+
+
+```{r}
+SpC_surface <- read.delim("data/CellLineCompartment_Surface_SumTickNormalization.tsv",  sep = '\t', skip=2, row.names = 'Accession')
+SpC_exosome <- read.csv("data/CellLineCompartment_Exosome_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_media <- read.csv("data/CellLineCompartment_Media_SumTickNormalization.csv", skip=2, row.names = 'Accession')
+SpC_nuclear <- read.delim("data/CellLineCompartment_Nuclear_SumTickNormalization.csv", sep = '\t', skip=2, row.names = 'Accession')
+SpCs <- list(TCE=SpC_TCE, surface=SpC_surface, exosome=SpC_exosome, media=SpC_media, nuclear=SpC_nuclear)
+```
+
+
+# extract IPAS numbers in each component dataset
+```{r}
+extract_IPAS <- function(matrix) {
+  str_extract(colnames(matrix), '(?<=\\.)IP.+?(?=\\.)')
+}
+
+IPAS_list <- lapply(SpCs, extract_IPAS)
+# for(i in seq(1, 300, 50)) {
+#   print(paste0(IPAS_list[i:(i+50)], collapse = ', '))
+# }
+
+```
+
+
+```{r}
+generating_raw_count <- function(IPAS, count_column, keep_isoform=FALSE) {
+  raw_count <- full_rawdata %>% 
+   dplyr::select(accession, ipas, !!count_column) %>%
+   filter(ipas %in% IPAS) %>%
+   pivot_wider(names_from = ipas, values_from = !!count_column) %>% 
+   replace(is.na(.), 0)
+
+  raw_count_mat <- as.matrix(raw_count[-1])
+  rownames(raw_count_mat) <- pull(raw_count[1])
+  raw_count_mat <- raw_count_mat[rowSums(raw_count_mat) > 0, ]
+  raw_count_mat <- raw_count_mat[, colSums(raw_count_mat) > 0 ]
+  
+  if(!keep_isoform) {
+    raw_count_mat <- remove_isoforms(raw_count_mat)
+  }
+  
+  cat(count_column, ': ',
+      'number of col', ncol(raw_count_mat), '\n',
+      'number of row', nrow(raw_count_mat), '\n')
+  
+  return(raw_count_mat)
+}
+
+# example
+# generating_raw_count(IPAS_list$TCE, count_column = 'tce_mscnt')
+```
+
+
+
+```{r}
+raw_count_mats <- mapply(generating_raw_count, IPAS_list[-which(names(IPAS_list) == 'exosome')], c('tce_mscnt', 'surface_mscnt', 'media_mscnt', 'nuclear_mscnt'))
+```
+# check overlap
+```{r}
+IPAS_list$TCE[which(!IPAS_list$TCE %in% unique(full_rawdata$ipas))]
+IPAS_list$surface[which(!IPAS_list$surface %in% unique(full_rawdata$ipas))]
+IPAS_list$media[which(!IPAS_list$media %in% unique(full_rawdata$ipas))]
+IPAS_list$nuclear[which(!IPAS_list$nuclear %in% unique(full_rawdata$ipas))]
+```
+
+
+```{r}
+# head(raw_count_mats$TCE)
+```
+
+# check distribution !take long time to run
+```{r}
+# boxplot(as.data.frame(raw_count_mats$TCE))
+```
+
+
+# sort column by column names
+```{r}
+sort_by_column <- function(mat) {
+  return(mat[, sort(colnames(mat))])
+}
+
+raw_count_mats <- lapply(raw_count_mats, sort_by_column)
+
+# raw_count_mats$TCE <- raw_count_mats$TCE[ ,sort(colnames(raw_count_mats$TCE))]
+```
+
+
+# Approach 1
+# combine isoforms by summing them
+```{r}
+# rownames(raw_count_mats$TCE) <- str_extract(rownames(raw_count_mats$TCE), pattern = '[^-]+')
+
+
+combine_isoforms <- function(mat) {
+  tbl <- mat %>% as_tibble(rownames = 'accession') %>% 
+    mutate(accession=str_extract(accession, pattern = '[^-]+')) %>%
+    group_by(accession) %>% 
+    summarise_all(sum)
+  
+  out <- as.matrix(tbl[-1])
+  # need to use pull to make it as vector
+  rownames(out) <- pull(tbl[1])
+  return(out)
+}
+
+# combine_isoforms(raw_count_mats$TCE)
+
+# raw_count_mats_iso_combined <- lapply(raw_count_mats, combine_isoforms)
+
+```
+
+
+# Approach 2
+# only keep canonical form (recommended by Jennifer) to avoid double-count
+```{r}
+raw_count_mats_iso_removed <- lapply(raw_count_mats, remove_isoforms)
+```
+
+
+# export raw count data
+```{r}
+# helper function write data to provided path
+write_to_csv <- function(mat, path) {
+  write.csv(as.data.frame(mat, row.names = rownames(mat)), path)
+}
+
+write_to_csv(raw_count_mats_iso_removed$TCE, 'data/cell line raw data/tce_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$surface, 'data/cell line raw data/surface_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$media, 'data/cell line raw data/media_raw_count.csv')
+write_to_csv(raw_count_mats_iso_removed$nuclear, 'data/cell line raw data/nuclear_raw_count.csv')
+```
+
+
+
+# generate omics metadata
+# do the conversion using biomaRt
+the result is better than using org.Hs.eg.db
+no missing gene symbol
+
+! there are some Ensembl gene id cannot be found by biomart
+https://support.bioconductor.org/p/111608/
+
+
+<!-- 15388 unmatched ensembl id -->
+<!-- ```{r} -->
+<!-- annots <- AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, keys=rownames(count_TPM_mat),  -->
+<!--                 columns="SYMBOL", keytype="ENSEMBL") -->
+<!-- ``` -->
+
+
+
+```{r eval=FALSE, include=FALSE}
+load('cache/count_TPM.rda')
+
+mart <- biomaRt::useDataset("hsapiens_gene_ensembl", biomaRt::useMart("ensembl"))
+dict_ensembl_to_symbol <- biomaRt::getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id","hgnc_symbol", "start_position","end_position"), values=rownames(count_TPM_mat), mart= mart)
+dict_ensembl_to_symbol$gene_length=dict_ensembl_to_symbol$end_position - dict_ensembl_to_symbol$start_position
+dict_ensembl_to_symbol[dict_ensembl_to_symbol == ''] <- NA
+save(dict_ensembl_to_symbol, file='cache/dict_ensemble_to_symbol.rda')
+```
+
+
+```{r}
+load('cache/dict_ensemble_to_symbol.rda')
+# dict_ensembl_to_symbol
+```
+
+```{r eval=FALSE, include=FALSE}
+accession_metadata <- full_rawdata %>% dplyr::select(gene, accession, length) %>% unique()
+load('cache/dict_ensemble_to_symbol.rda')
+omics_metadata <- dict_ensembl_to_symbol %>% full_join(accession_metadata, by = c('hgnc_symbol'='gene')) %>% dplyr::select(-c(start_position, end_position)) %>% dplyr::select(accession, hgnc_symbol, ensembl_gene_id, gene_length, length)
+colnames(omics_metadata) <- c('accession_id', 'gene_symbol', 'ensembl_gene_id', 'gene_length', 'protein_length')
+head(omics_metadata)
+write_csv(omics_metadata, file = 'data/support data/omics_metadata.csv')
+
+
+omics_metadata <- read_csv('data/support data/omics_metadata.csv')
+protein_length <- omics_metadata %>% dplyr::select(accession_id, protein_length) %>% unique() %>% na.omit()
+protein_length_df <- data.frame(length=protein_length$protein_length, row.names = protein_length$accession_id)
+save(protein_length_df, file = 'cache/protein_length.rda')
+```
+```{r}
+load('cache/protein_length.rda')
+```
+
+
+
+
+```{r}
+nasf_mat <- lapply(raw_count_mats_iso_removed, nsaf, protein_length=protein_length_df, per_count=10e6)
+```
+
+
+# export nasf data
+```{r}
+write_to_csv(nasf_mat$TCE, 'data/cell line raw data/nasf_tce.csv')
+write_to_csv(nasf_mat$surface, 'data/cell line raw data/nasf_surface.csv')
+write_to_csv(nasf_mat$media, 'data/cell line raw data/nasf_media.csv')
+write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear.csv')
+```
+
+
+# only keep when count >= 2
+```{r}
+filter_greater_than_two <- function(count_mat) {
+  count_mat[count_mat <= 1] <- 0
+  return(count_mat)
+}
+
+raw_count_mats_iso_removed_2 <- lapply(raw_count_mats_iso_removed, filter_greater_than_two)
+mapply(write_to_csv, raw_count_mats_iso_removed_2, path=list('data/cell line raw data/tce_raw_count_2.csv', 
+                                                          'data/cell line raw data/surface_raw_count_2.csv',
+                                                          'data/cell line raw data/media_raw_count_2.csv',
+                                                          'data/cell line raw data/nuclear_raw_count_2.csv'))
+
+nasf_mat <- lapply(raw_count_mats_iso_removed_2, nsaf, protein_length=protein_length_df, per_count=10e6)
+
+write_to_csv(nasf_mat$TCE, 'data/cell line raw data/nasf_tce_2.csv')
+write_to_csv(nasf_mat$surface, 'data/cell line raw data/nasf_surface_2.csv')
+write_to_csv(nasf_mat$media, 'data/cell line raw data/nasf_media_2.csv')
+write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear_2.csv')
+```
+
+
+
+
+
+
+
+# filter with missing proteins
+```{r}
+missing_protein_df <- readxl::read_xlsx('data/support data/PE2-5.xlsx')
+# missing_protein_df <- missing_protein_df %>% filter(PE != 'Uncertain')
+save(missing_protein_df, file='cache/missing_protein.rda')
+```
+
+
+
+```{r}
+nasf_mat_missing_protein <- lapply(nasf_mat, SpC_List, annotation=NULL, NA_substitution = NULL, proteins_filter = missing_protein_df$Accession)
+```
+
+# export nasf data with only missing protein
+```{r}
+write_to_csv(nasf_mat_missing_protein$TCE$matrix, 'data/nasf/nasf_tce_missing_protein.csv')
+write_to_csv(nasf_mat_missing_protein$surface$matrix, 'data/nasf/nasf_surface_missing_protein.csv')
+write_to_csv(nasf_mat_missing_protein$media$matrix, 'data/nasf/nasf_media_missing_protein.csv')
+write_to_csv(nasf_mat_missing_protein$nuclear$matrix, 'data/nasf/nasf_nuclear_missing_protein.csv')
+```
+
+
+# generate annotation data for all samples in the nasf_accession file
+```{r}
+
+# create annotation for IPAS
+IPAS_annotation <- full_rawdata %>% select(ipas, disease, subtype) %>% unique() %>% arrange(disease, subtype)
+write_csv(IPAS_annotation, file = 'data/support data/IPAS_annotation.csv')
+```
+
+
+# generate primary cell raw count and NSAF data
+```{r}
+# since IP0972_1701 doesn't have corresponding MS count data, we won't keep it in the MS count data
+IPAS_in_RNA_Seq <- paste0(c('IP7103', 'IP0995', 'IP0982', 'IP0999', 'IP7100', 'IP0993', 'IP0981', 'IP7105'), '_1701')
+gastric_primary_cell_count_mat <- generating_raw_count(IPAS = IPAS_in_RNA_Seq, count_column = 'tce_mscnt', keep_isoform=FALSE)
+```
+
+
+
+
+```{r}
+gastric_primary_cell_nsaf_mat <- nsaf(gastric_primary_cell_count_mat, protein_length_df, per_count = 10e6, na_fill=0)
+gastric_primary_cell_nsaf_mat <- gastric_primary_cell_nsaf_mat[rowSums(gastric_primary_cell_nsaf_mat > 0) > 0, ]
+head(gastric_primary_cell_nsaf_mat)
+```
+
+
+## export data
+```{r}
+write_to_csv(gastric_primary_cell_count_mat, 'data/gastric_primary_cell/gastric_primary_cell_count.csv')
+write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_primary_cell_nsaf.csv')
+```
+
+
+
+# only keep count >= 2
+```{r}
+gastric_primary_cell_count_mat[gastric_primary_cell_count_mat <= 1] <- 0
+gastric_primary_cell_nsaf_mat <- nsaf(gastric_primary_cell_count_mat, protein_length_df, per_count = 10e6, na_fill=0)
+# fill those less than 2 spectral count read as 0 and filter proteins that are 0 for all samples
+gastric_primary_cell_nsaf_mat <- gastric_primary_cell_nsaf_mat[rowSums(gastric_primary_cell_nsaf_mat > 0) > 0, ]
+gastric_primary_cell_count_mat <- gastric_primary_cell_count_mat[rowSums(gastric_primary_cell_count_mat > 0) > 0, ]
+write_to_csv(gastric_primary_cell_count_mat, 'data/gastric_primary_cell/gastric_primary_cell_count_2.csv')
+write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_primary_cell_nsaf_2.csv')
+```

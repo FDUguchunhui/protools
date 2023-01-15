@@ -10,5 +10,6 @@ rownames_mapping(x, dictionary, map_from, map_to)
 \item{x}{a numeric matrix, cannot be a data.frame since duplicated row names are not allowed in data.frame}
 }
 \description{
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
 use with caution for when there are multiple-to-multiple mapping exist in the dictionary
 }

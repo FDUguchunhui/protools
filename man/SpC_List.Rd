@@ -9,7 +9,8 @@ SpC_List(
   annotation,
   NA_substitution = NULL,
   proteins_filter = NULL,
-  replicates_remove = NULL
+  replicates_remove = NULL,
+  replicates_keep = NULL
 )
 }
 \arguments{

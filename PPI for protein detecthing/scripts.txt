@@ -1,0 +1,3 @@
+csvstack *_IA_final_peptide.csv > combined_peptide.csv
+
+csvstack -e utf-8 -v  *_IA_final_protein.csv > combined_protein.csv

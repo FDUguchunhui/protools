@@ -1,0 +1,31 @@
+---
+title: "interaction_prep"
+output: html_document
+date: "2023-01-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+
+
+```{r}
+string_interaction <- read_delim('data/9606.protein.links.v11.5.txt', delim=' ')
+```
+
+```{r}
+proteins_ENSP <- unique(c(string_interaction$protein1, string_interaction$protein2))
+```
+
+```{r}
+write_csv(data.frame(proteins=proteins_ENSP), 'data/proteins_ENSP.csv')
+```
+
