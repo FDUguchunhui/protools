@@ -116,7 +116,7 @@ rownames_mapping <- function(x, dictionary, map_from, map_to) {
     warning('one-to-many mapping exists, only take the first pair of that map_from key, please be cautious about the result!\n',
             'Please check whether the multiple value being matched to one key is caused by NA or missing value for some keys
             since they are treated as the same\n', 
-            'the number of "map_from" key with multiple "map_to" values is ', sum(num_values_per_key > 1, '\n'))
+            'the number of "map_from" key with multiple "map_to" values is ', sum(num_values_per_key > 1), '\n')
     dictionary <- dictionary %>% dplyr::group_by(.data[[map_from]]) %>% 
       dplyr::arrange(.data[[map_to]]) %>% 
       dplyr::summarise(!!map_to := first(.data[[map_to]]))

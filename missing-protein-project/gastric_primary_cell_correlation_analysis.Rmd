@@ -6,6 +6,7 @@ date: "2022-09-21"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'missing-protein-project')
 ```
 
 
@@ -15,11 +16,11 @@ library(tidyverse)
 
 
 ```{r}
-gastric_nsaf <- as.matrix(read.csv('missing-protein-project/data/gastric-primary-cell/gastric_primary_cell_nsaf.csv', row.names = 1))
-gastric_count <- read_csv('missing-protein-project/data/gastric-primary-cell/gastric_primary_cell_count_2.csv', show_col_types = FALSE)
+gastric_nsaf <- as.matrix(read.csv('data/gastric-primary-cell/gastric_primary_cell_nsaf.csv', row.names = 1))
+gastric_count <- read_csv('data/gastric-primary-cell/gastric_primary_cell_count_2.csv', show_col_types = FALSE)
 colnames(gastric_count)[1] <- 'accession'
-omics_metadata <- read_csv('missing-protein-project/data/support-data/omics_metadata.csv', show_col_types = FALSE)
-load('missing-protein-project/cache/missing_protein.rda')
+omics_metadata <- read_csv('data/support-data/omics_metadata.csv', show_col_types = FALSE)
+load('cache/missing_protein.rda')
 ```
 # create missing protein only use P2-4
 # the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
@@ -317,11 +318,12 @@ mapping_to_entrez <- function(gene_names) {
 ```{r}
 pathways_analysis_MP <- limma::goana(mapping_to_entrez(detected_MP_proteins$accession), plot=TRUE)
 
-expressed_regular_proteins <- combined_long %>% filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>%  filter(!(accession %in% P2_5_proteins)) %>% filter(NSAF > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n()) %>% filter(n >= 6)
+expressed_regular_proteins <- combined_long %>% filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>%  filter(!(accession %in% P2_5_proteins)) %>% filter(NSAF > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n()) %>% filter(n >= 3)
 pathways_analysis_RP <- limma::goana(mapping_to_entrez(expressed_regular_proteins$accession), plot=TRUE)
 
 
 all_expressed_proteins <- union(expressed_regular_proteins$accession, detected_MP_proteins$accession)
+write_csv(tibble(accession=all_expressed_proteins), 'data/expressed-protein-reference-set.csv')
 pathways_analysis_all <- limma::goana(mapping_to_entrez(all_expressed_proteins), plot=TRUE)
 ```
 

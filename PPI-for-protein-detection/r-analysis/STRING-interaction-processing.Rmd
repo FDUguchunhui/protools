@@ -139,8 +139,36 @@ write_csv(swiss_proteins_0981_short_unique, file='PPI-for-protein-detection/data
 
 # ******************************* generate reference set
 # ****************************************************************************
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+gastric_nsaf <- read.csv('PPI-for-protein-detection/data/gastric-primary-cell/gastric_primary_cell_nsaf.csv')
+```
+
+
+
+
+
+```{r}
+expressed_proteins <-  gastric_nsaf %>% select(-c(IP0981_1701, IP7103_1701)) %>% mutate(across(IP0982_1701:IP7105_1701, ~ .x == 0)) %>% rowwise() %>% 
+  mutate(num_zeros=sum(c_across(IP0982_1701:IP7105_1701))) %>% filter(num_zeros >= 3) %>% select(X) %>% pull()
+```
+```{r}
+expressed_proteins_swiss_prot <- expressed_proteins[expressed_proteins %in% nextprot_proteins$acc_code]
+```
+
+
+```{r}
+write_csv(tibble(accession=expressed_proteins_swiss_prot), file = 'PPI-for-protein-detection/data/expressed-protein.csv')
+```
+
+
+
 ```{r}
 
 ```
-
 
