@@ -1,0 +1,146 @@
+---
+title: "interaction-prep"
+output: html_document
+date: "2023-01-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(tidyverse)
+```
+
+# read string interaction data file
+```{r}
+string_interaction <- read_delim('PPI-for-protein-detection/data/STRING/9606.protein.links.v11.5.txt', delim=' ', show_col_types = FALSE)
+```
+
+# extract the protein ID in the STRING interaction file
+```{r}
+proteins_ENSP <- unique(c(string_interaction$protein1, string_interaction$protein2))
+```
+
+# write protein ID needed to be mapped to Uniprot accession ID
+```{r}
+write_csv(data.frame(proteins=proteins_ENSP), 'data/STRING/proteins-ENSP.csv')
+```
+
+```{r}
+mapping_dat <- read_delim('PPI-for-protein-detection/data/STRING/ENSP-to-accession.tsv', delim = '\t', show_col_types = FALSE)
+mapping_dat <- janitor::clean_names(mapping_dat)
+```
+
+
+# mapping ENSP to accession
+```{r}
+dictionary <- mapping_dat %>% select(from, entry)
+string_interaction$protein1_acc <-  mapping(string_interaction$protein1, dictionary = dictionary)
+string_interaction$protein2_acc <-  mapping(string_interaction$protein2, dictionary = dictionary)
+# remove interaction that contain any proteins that cannot be mapped back to accession
+#  11,938,498 -> 11,607,094
+string_interaction_acc <- string_interaction %>% select(protein1_acc, protein2_acc, combined_score) %>% filter(!(is.na(protein1_acc) | is.na(protein2_acc)))
+```
+
+```{r}
+write_csv(string_interaction_acc, 'PPI-for-protein-detection/data/STRING/STRING-interaction-acc.csv')
+```
+
+# check overlapping between STRING interaction and SWISS-Prot protein
+```{r}
+STRING_unique_proteins <- unique(c(string_interaction_acc$protein1_acc, string_interaction_acc$protein2_acc))
+length()
+# import the unfiltered gastric 0981 sample data
+all_proteins_0981 <- read_csv('PPI-for-protein-detection/data/raw-data/TCE-cgu3/combined_protein.csv', show_col_types = FALSE)
+all_proteins_0981 <- all_proteins_0981 %>% janitor::clean_names()
+all_proteins_0981 <- all_proteins_0981 %>% select(protein_accession, protein_data_base_type, protein_score, protein_matched_peptides,  protein_matched_peptide_inten_sum)
+```
+
+
+```{r}
+string_interaction_swiss_prot <-  string_interaction_acc %>% filter(protein1_acc %in% swiss_prot_protein_entries & protein2_acc %in% swiss_prot_protein_entries)
+write_csv(string_interaction_swiss_prot, 'PPI-for-protein-detection/data/STRING/STRING-interaction-swiss.csv')
+```
+
+
+
+
+
+```{r}
+nextprot_proteins <- readxl::read_xls('PPI-for-protein-detection/data/nextprot_protein_entries.xls')
+nextprot_proteins <- janitor::clean_names(nextprot_proteins)
+nextprot_proteins$acc_code <-  str_extract(nextprot_proteins$acc_code, '(?<=NX_).+')
+write_csv(nextprot_proteins, file = 'PPI-for-protein-detection/data/nextprot-proteins.csv')
+```
+
+## extract nextprot proteins ID
+```{r}
+regular_protein_entries <- nextprot_proteins %>% filter(PE=='Evidence at protein level') %>% select(acc_code) %>% pull()
+swiss_prot_protein_entries <- nextprot_proteins %>% select(acc_code) %>% pull()
+```
+
+
+
+# the STRING PPI database cover 95% of swiss-prot proteins
+```{r}
+swiss_proteins_0981 <- all_proteins_0981 %>%  filter(`protein_accession` %in% swiss_prot_protein_entries)
+mean(unique(swiss_proteins_0981$protein_accession) %in% STRING_unique_proteins)
+# STRING PPI interaction contain some protein that is not in SWISS-prot proteins (only 356 non-swiss-prot proteins)
+mean(STRING_unique_proteins %in% unique(swiss_prot_protein_entries))
+sum(!(STRING_unique_proteins %in% unique(swiss_prot_protein_entries)))
+STRING_unique_proteins[!(STRING_unique_proteins %in% swiss_prot_protein_entries)]
+```
+
+
+# check protein evidence combined_score distribution
+```{r}
+hist(string_interaction_acc$combined_score)
+```
+
+
+
+
+# *****************************import the unfiltered gastric 0981 sample data
+ [1] "protein_key"                           "protein_entry"                         "protein_accession"                    
+ [4] "protein_description"                   "protein_data_base_type"                "protein_score"                        
+ [7] "protein_false_positive_rate"           "protein_avg_mass"                      "protein_matched_products"             
+[10] "protein_matched_peptides"              "protein_digest_peps"                   "protein_seq_cover_percent"            
+[13] "protein_matched_peptide_inten_sum"     "protein_top3matched_peptide_inten_sum" "protein_matched_product_inten_sum"    
+[16] "protein_fmol_on_column"                "protein_ngram_on_column"               "protein_auto_curate"                  
+[19] "protein_sum_num_by_calc"               "protein_sum_num_by_pep_frag1"          "protein_accession_key_for_homologs"   
+[22] "protein_key_for_homologs"              "protein_num_unique_peptides" 
+```{r}
+all_proteins_0981 <- read_csv('PPI-for-protein-detection/data/raw-data/TCE-cgu3/combined_protein.csv', show_col_types = FALSE)
+all_proteins_0981 <- all_proteins_0981 %>% janitor::clean_names()
+# all_proteins_0981 <- all_proteins_0981 %>% select(protein_accession, protein_data_base_type, protein_score, protein_matched_peptides,  protein_matched_peptide_inten_sum)
+```
+
+
+## filter out Random sequence and only keep SWISS-Prot proteins 
+```{r}
+swiss_proteins_0981 <- all_proteins_0981 %>% filter((protein_data_base_type == 'Regular') & (`protein_accession` %in% swiss_prot_protein_entries))
+swiss_proteins_0981_short <- swiss_proteins_0981 %>% select(!c(protein_key, protein_entry, protein_description, protein_data_base_type, protein_false_positive_rate, protein_fmol_on_column, protein_ngram_on_column, protein_accession_key_for_homologs, protein_key_for_homologs))
+
+# for duplicate proteins resulted from combined different segements 
+# only keep the one with largest protein score
+swiss_proteins_0981_short_unique <- swiss_proteins_0981_short %>% group_by(protein_accession) %>% arrange(protein_score) %>% filter(row_number() == 1)
+nrow(swiss_proteins_0981_short_unique)
+```
+
+
+
+```{r}
+write_csv(swiss_proteins_0981_short_unique, file='PPI-for-protein-detection/data/proteins-sample-0981.csv')
+```
+
+
+# ******************************* generate reference set
+# ****************************************************************************
+```{r}
+
+```
+
+

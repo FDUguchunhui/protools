@@ -1,0 +1,174 @@
+---
+title: "ppi"
+output: html_document
+date: "2023-01-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+ppi <- read.delim('data/BioGRID/BioGRID-ORGANISM-Homo_sapiens-4.4.217.mitab.txt')
+ppi_short <- ppi[1:100, ]
+head(ppi_short)
+
+# the type of interaction maybe useful ?
+```
+
+```{r}
+nextprot <- readxl::read_xls('data/nextprot_protein_entries.xls')
+nextprot$`acc. code` <-  str_extract(nextprot$`acc. code`, '(?<=NX_).+')
+regular_protein_entries <- nextprot %>% filter(PE=='Evidence at protein level') %>% select(`acc. code`) %>% pull()
+swiss_prot_protein_entries <- nextprot %>% select(`acc. code`) %>% pull()
+```
+
+
+
+```{r}
+# non-greedy extract uniprot accession id
+# interactor_A <- str_extract(ppi$Alt.IDs.Interactor.A, '(?<=uniprot/swiss-prot:).+?(?=\\|)')
+# interactor_B <- str_extract(ppi$Alt.IDs.Interactor.B, '(?<=uniprot/swiss-prot:).+?(?=\\|)')
+# save(interactor_A, interactor_B, file='cache/interactors.RData')
+load('cache/interactors.RData')
+ppi$interactor_A = interactor_A
+ppi$interactor_B = interactor_B
+# why there are proteins # 7,469 that interaction with itself?
+# ppi %>% filter(interactor_A == interactor_B)
+
+
+# 1, 123, 749 interactions
+ppi_binary <- tibble(interactor_A=interactor_A, interactor_B=interactor_B)
+# 1, 123, 606 interactions after filtering interactions with proteins that don't have uniprot swiss-prot accession
+# and 863,127 unique after only consider interactor A and interactor B
+ppi_binary <- ppi_binary %>% filter(!(is.na(interactor_A) | is.na(interactor_B))) %>% unique() %>% filter(interactor_A != interactor_B)
+# rm(ppi)
+# 24, 556 unique proteins 
+ppi_unique_proteins <- unique(c(ppi_binary$interactor_A, ppi_binary$interactor_B))
+# sort(ppi_unique_proteins)
+# ppi_unique_proteins[!(ppi_unique_proteins %in% nextprot$`acc. code`)]
+length(ppi_unique_proteins)
+```
+
+```{r}
+ppi_binary_reverse <- tibble(interactor_A=ppi_binary$interactor_B, interactor_B=ppi_binary$interactor_A)
+ppi_binary_full <- unique(rbind(ppi_binary, ppi_binary_reverse))
+```
+
+
+
+```{r}
+interaction_one_to_many <- ppi_binary_full %>%  group_by(interactor_A) %>% summarise(interact_with=paste(interactor_B, collapse = '|')) 
+```
+
+
+
+
+# import primary cell gastric data
+```{r}
+gastric_nsaf <- read.csv('data/gastric-primary-cell/gastric_primary_cell_nsaf.csv', row.names = 1)
+gastric_nsaf_proteins <- rownames(gastric_nsaf)
+# only 11, 082 proteins of gastric proteins are in nextprot database 
+# The original result contein Swiss-prot and TrEMBL results
+# some of the TrEMBL are computationally curated and could an isoform of some swiss-prot proteins but with its own entry (without -number suffix)
+sum(gastric_nsaf_proteins %in% nextprot$`acc. code`)
+# gastric_nsaf_proteins[!(gastric_nsaf_proteins %in% nextprot$`acc. code`)]
+sum(gastric_nsaf_proteins %in% regular_protein_entries)
+# 10, 522 was covered by protein-protein interaction
+sum(gastric_nsaf_proteins %in% ppi_unique_proteins)
+```
+
+
+
+# import the unfiltered gastric 0981 sample data
+```{r}
+all_proteins_0981 <- read_csv('PPI-for-protein-detection/data/raw-data/TCE-cgu3/combined_protein.csv', show_col_types = FALSE)
+all_proteins_0981 <- all_proteins_0981 %>% janitor::clean_names()
+all_proteins_0981 <- all_proteins_0981 %>% select(protein_accession, protein_data_base_type, protein_score, protein_matched_peptides,  protein_matched_peptide_inten_sum)
+```
+
+```{r}
+all_proteins_0981  %>% arrange(protein_score)
+```
+```{r}
+swiss_proteins_0981 <- all_proteins_0981 %>%  filter((protein_data_base_type == 'Random') | (`protein_accession` %in% swiss_prot_protein_entries))
+```
+
+
+```{r}
+ggplot(data=all_proteins_0981, aes(fill=`protein_data_base_type`)) +
+  geom_histogram(aes(x=log(`protein_score`)), position = 'identity', alpha=0.5)
+
+
+ggplot(data=swiss_proteins_0981, aes(fill=`protein_data_base_type`)) +
+  geom_histogram(aes(x=log(`protein_score`)), position = 'identity', alpha=0.5)
+
+```
+
+```{r}
+dat <- swiss_proteins_0981 %>% arrange(desc(protein_score)) %>% mutate(rank=row_number()) %>% mutate(num_of_decoy_hits=cumsum(protein_data_base_type=='Random')) %>% mutate(FDR=num_of_decoy_hits/rank)
+
+
+unique_protein_dat <- dat %>% group_by(protein_accession) %>% arrange(FDR) %>% filter(row_number() == 1) %>% filter(protein_data_base_type=='Regular') %>%  select(protein_accession, protein_score, FDR)
+write_csv(unique_protein_dat, 'data/protein_scores.csv')
+unique_protein_dat <- dat %>% group_by(protein_accession) %>% arrange(FDR) %>% filter(row_number() == 1) %>% filter(protein_data_base_type=='Regular')
+write_csv(unique_protein_dat, 'data/protein_scores.csv')
+```
+
+```{r}
+# (log(dat$protein_score), dat$FDR)
+
+ggplot(dat %>% arrange(desc(protein_score)), aes(x=log(protein_score), y=FDR)) +
+  geom_step() +
+  scale_x_reverse()
+```
+
+
+```{r}
+dat_FDR_05 <- dat %>% filter(FDR < 0.05)
+length(unique(dat_FDR_05$protein_accession))
+```
+
+
+
+```{r}
+all_proteins_0981$protein_accession
+```
+
+
+
+
+
+
+
+
+```{r}
+write_csv(interaction_one_to_many, 'data/interactions.csv')
+write_csv(ppi_binary_full, 'data/interactions_binary.csv')
+```
+
+```{r}
+ppi_binary$interactor_A == ppi_binary$interactor_B
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+interaction_one_to_many %>% mutate(points = str_match_all(interact_with, pattern))
+
+pattern <- paste(swiss_proteins_0981$protein_accession, collapse = '|')
+```
+
