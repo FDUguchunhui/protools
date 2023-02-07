@@ -1,3 +1,11 @@
 csvstack *_IA_final_peptide.csv > combined_peptide.csv
 
-csvstack -e utf-8 -v  *_IA_final_protein.csv > combined_protein.csv
+# combined water protein data directly from remote driver
+csvstack -e utf-8 -v  *_IA_final_protein.csv > /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/raw-data/combined-protein/combined_protein_7103.csv
+
+# pre-processing data with information from uniprot
+python CSVTransformer.py /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/raw-data/combined-protein/combined_protein_7103.csv -a /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/uniprot_protein_entries.tsv
+
+
+python CSVTransformer.py /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/raw-data/combined-protein/combined_protein_7103.csv -a /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/uniprot_protein_entries.tsv -o /Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/proteomics/project/PPI-for-protein-detection/data/raw-data/processed-combined-protein/combined_protein_7103_processed.csv
+

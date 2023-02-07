@@ -70,15 +70,15 @@ write_csv(string_interaction_swiss_prot, 'PPI-for-protein-detection/data/STRING/
 
 
 ```{r}
-nextprot_proteins <- readxl::read_xls('PPI-for-protein-detection/data/nextprot_protein_entries.xls')
+nextprot_proteins <- readxl::read_xls('data/nextprot_protein_entries.xls')
 nextprot_proteins <- janitor::clean_names(nextprot_proteins)
 nextprot_proteins$acc_code <-  str_extract(nextprot_proteins$acc_code, '(?<=NX_).+')
-write_csv(nextprot_proteins, file = 'PPI-for-protein-detection/data/nextprot-proteins.csv')
+write_csv(nextprot_proteins, file = 'data/nextprot-proteins.csv')
 ```
 
 ## extract nextprot proteins ID
 ```{r}
-regular_protein_entries <- nextprot_proteins %>% filter(PE=='Evidence at protein level') %>% select(acc_code) %>% pull()
+regular_protein_entries <- nextprot_proteins %>% filter(pe=='Evidence at protein level') %>% select(acc_code) %>% pull()
 swiss_prot_protein_entries <- nextprot_proteins %>% select(acc_code) %>% pull()
 ```
 
@@ -113,7 +113,7 @@ hist(string_interaction_acc$combined_score)
 [19] "protein_sum_num_by_calc"               "protein_sum_num_by_pep_frag1"          "protein_accession_key_for_homologs"   
 [22] "protein_key_for_homologs"              "protein_num_unique_peptides" 
 ```{r}
-all_proteins_0981 <- read_csv('PPI-for-protein-detection/data/raw-data/TCE-cgu3/combined_protein.csv', show_col_types = FALSE)
+all_proteins_0981 <- read_csv('data/raw-data/combined-protein/combined_protein_7103.csv', show_col_types = FALSE)
 all_proteins_0981 <- all_proteins_0981 %>% janitor::clean_names()
 # all_proteins_0981 <- all_proteins_0981 %>% select(protein_accession, protein_data_base_type, protein_score, protein_matched_peptides,  protein_matched_peptide_inten_sum)
 ```
@@ -126,14 +126,14 @@ swiss_proteins_0981_short <- swiss_proteins_0981 %>% select(!c(protein_key, prot
 
 # for duplicate proteins resulted from combined different segements 
 # only keep the one with largest protein score
-swiss_proteins_0981_short_unique <- swiss_proteins_0981_short %>% group_by(protein_accession) %>% arrange(protein_score) %>% filter(row_number() == 1)
+swiss_proteins_short_unique <- swiss_proteins_0981_short %>% group_by(protein_accession) %>% arrange(protein_score) %>% filter(row_number() == 1)
 nrow(swiss_proteins_0981_short_unique)
 ```
 
 
 
 ```{r}
-write_csv(swiss_proteins_0981_short_unique, file='PPI-for-protein-detection/data/proteins-sample-0981.csv')
+write_csv(swiss_proteins_short_unique, file='data/proteins-sample-7103.csv')
 ```
 
 
