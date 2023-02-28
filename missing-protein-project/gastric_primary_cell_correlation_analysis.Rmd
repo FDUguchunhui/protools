@@ -169,6 +169,7 @@ count_TPM_gene_symbol <- count_TPM_gene_symbol[, colnames(gastric_nsaf_gene_leve
 
 head(count_TPM_gene_symbol)
 nrow(count_TPM_gene_symbol)
+write_csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary_cell.csv')
 ```
 
 # rename to sample 1- 8

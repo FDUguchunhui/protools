@@ -168,7 +168,5 @@ write_csv(tibble(accession=expressed_proteins_swiss_prot), file = 'PPI-for-prote
 
 
 
-```{r}
 
-```
 

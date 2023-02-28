@@ -38,3 +38,7 @@ summarize_by_case <- function(tbl, proteins_subset, negate=FALSE, remove_IPAS=NU
 
 
 b <- summarize_by_case(combined_long, proteins_subset=missing_proteins, group_by_IPAS = FALSE, cases = c(1, 2))
+
+
+
+dat <- read_csv('missing-protein-project/data/output/missing_protein_details_1.csv')
