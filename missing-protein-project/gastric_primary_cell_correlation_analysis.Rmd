@@ -12,12 +12,16 @@ knitr::opts_knit$set(root.dir = 'missing-protein-project')
 
 ```{r}
 library(tidyverse)
+# install.packages("devtools")
+if (!require("protools", quietly = TRUE))
+   devtools::install_github("https://github.com/FDUguchunhui/protools")
+library('protools')
 ```
 
 
 ```{r}
 gastric_nsaf <- as.matrix(read.csv('data/gastric-primary-cell/gastric_primary_cell_nsaf_2.csv', row.names = 1))
-gastric_count <- read_csv('data/gastric-primary-cell/gastric_primary_cell_count_2.csv', show_col_types = FALSE)
+gastric_count <- read_csv('data/gastric-primary-cell/gastric_primary_cell_count.csv', show_col_types = FALSE)
 colnames(gastric_count)[1] <- 'accession'
 omics_metadata <- read_csv('data/support-data/omics_metadata.csv', show_col_types = FALSE)
 load('cache/missing_protein.rda')
@@ -27,10 +31,10 @@ load('cache/missing_protein.rda')
 ```{r}
 # missing_protein_df <- missing_protein_df %>% filter(PE == 'Evidence at transcript level')
 missing_proteins <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(`gene name(s)`) %>% pull
-P1_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
+P2_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
 
 missing_proteins_accession <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(Accession) %>% pull
-P1_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
+P2_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
 ```
 
 # check the number of PSM for each proteins for missing and regular proteins
@@ -39,7 +43,7 @@ MP_counts <- gastric_count %>% filter(accession %in% missing_proteins_accession)
 MP_counts_long <- MP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
 
 
-RP_counts <-  gastric_count %>% filter(!(accession %in% P1_5_proteins_accession))
+RP_counts <-  gastric_count %>% filter(!(accession %in% P2_5_proteins_accession))
 RP_counts_long <- RP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
 ```
 
@@ -169,7 +173,7 @@ count_TPM_gene_symbol <- count_TPM_gene_symbol[, colnames(gastric_nsaf_gene_leve
 
 head(count_TPM_gene_symbol)
 nrow(count_TPM_gene_symbol)
-write_csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary_cell.csv')
+write.csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary_cell.csv')
 ```
 
 # rename to sample 1- 8
@@ -261,12 +265,13 @@ table(missing_protein_df$PE)
 # the total number of unique missing proteins
 # freq <- combined_long %>% filter(accession %in% missing_proteins) %>% filter(NSAF > 0) %>% select(accession) %>% unique()
 
-detected_MP_proteins <- combined_long %>% filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>%  filter(accession %in% missing_proteins) %>% filter(NSAF > 0  & TPM > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n()) %>% filter(n >= 2)
-hist(detected_MP_proteins$n)
+detected_MP_proteins <- combined_long %>%  filter(accession %in% missing_proteins) %>% filter(NSAF > 0  & TPM > 0) %>% arrange(accession) %>% group_by(accession) 
+# %>% summarise(n=n()) %>% filter(n >= 2)
+# hist(detected_MP_proteins$n)
 
 
 # check the protein and RNA expression for the detected missing proteins
-full_table_detected_MP <- combined_long %>%  filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>% filter(accession %in% missing_proteins) %>% filter(NSAF > 0 & TPM > 0) %>% arrange(accession, IPAS) %>% filter(accession %in% detected_MP_proteins$accession)
+full_table_detected_MP <- combined_long %>% filter(accession %in% missing_proteins) %>% filter(NSAF > 0 & TPM > 0) %>% arrange(accession, IPAS) %>% filter(accession %in% detected_MP_proteins$accession)
 full_table_detected_MP <- inner_join(full_table_detected_MP, detected_MP_proteins)
 
 # 
@@ -276,7 +281,7 @@ left_join(full_table_detected_MP, MP_counts_long, by = c('accession', 'IPAS'))
 # rownames(MP_count_mat) <- MP_counts$accession
 # MP_count_mat_gene_level <- rownames_mapping(MP_count_mat, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
 
-write_csv(full_table_detected_MP, 'output/protein list/detected_missing_protein.csv')
+write_csv(full_table_detected_MP, 'output/protein list/detected_104_MP_products_with_RNA.csv')
 
 ```
 
@@ -423,7 +428,7 @@ dat_hist$IPAS <- factor(dat_hist$IPAS, levels = c("IP0981_1701", "IP0982_1701", 
 
 # Table 2 non-missing proteins
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 # the coverage rate of RNA product in protein product for non-missing protein
 (a <- summarize_by_case(combined_long, proteins_subset = P2_5_proteins, negate = TRUE, group_by_IPAS = TRUE, cases = c(1, 2)))
 
@@ -816,22 +821,245 @@ dens1 + patchwork::plot_spacer() + plt + dens2 +  patchwork::plot_layout(ncol = 
 # 
 # res1 <- cor.mtest(mtcars,0.95)
 
-library(corrplot)
-corrplot(cor(count_nsaf_missing, count_TPM_missing, method = 'pearson'))
+# library(corrplot)
+# corrplot(cor(count_nsaf_missing, count_TPM_missing, method = 'pearson'))
+```
+
+# Heatmap for missing protein
+```{r}
+# detected_MP_proteins <- combined_long %>% filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>%  filter(accession %in% missing_proteins) %>% filter(NSAF > 0  & TPM > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n()) %>% filter(n>= 2)  %>%  select(accession) %>% pull() %>% unique()
+
+# the number should be 85 if using two-SpC-rule
+detected_MP_proteins <- combined_long  %>%  filter(accession %in% missing_proteins) %>% filter(NSAF > 0  & TPM > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n())  %>%  select(accession) %>% pull() %>% unique()
 ```
 
 ```{r}
-glmm_dat_missing
+# double check clustering
+library(pheatmap)
+heatmap_dat <- log(gastric_nsaf_gene_level[detected_MP_proteins, ] + 1)
+colnames(heatmap_dat) =paste('sample', 1:8)
+pheatmap(heatmap_dat, 
+         show_rownames = T,
+         angle_col=45,
+         cluster_cols = T,
+         cluster_rows = T)
+```
+
+
+```{r}
+heatmap_dat_TPM <- log(count_TPM_gene_symbol[detected_MP_proteins, ] + 1)
+colnames(heatmap_dat_TPM) =paste('sample', 1:8)
+pheatmap(heatmap_dat_TPM, 
+         show_rownames = T,
+         angle_col=45,
+         cluster_cols = T,
+         cluster_rows = T)
+```
+
+
+## correlation plot for pairwise correlation of missing protein expression
+```{r}
+library(corrplot)
+corr <- cor(heatmap_dat, method = "spearman")
+corrplot.mixed(corr, lower = 'number', upper='ellipse', tl.cex=0.5,
+               na.label.col='black',
+               mar=c(0,0,2,0))
+```
+
+
+```{r}
+corr <- cor(heatmap_dat_TPM, method = "spearman")
+corrplot.mixed(corr, lower = 'number', upper='ellipse', tl.cex=0.6, na.label.col='black')
+```
+
+```{r}
+corr <- cor(t(heatmap_dat), t(heatmap_dat_TPM), method = "spearman")
+corr_diag <- diag(corr)
+pheatmap(corr)
 ```
 
 
 
+```{r}
+# corr <- cor(count_nsaf_missing, count_TPM_missing)
+# mean(diag(corr) > 0.2, na.rm = T)
+# library(corrplot)
+# corrplot(corr, method = 'color', na.label.col='black')
+```
+
 
 
 ```{r}
-corr <- cor(t(count_nsaf_missing), t(count_TPM_missing))
-mean(diag(corr) > 0.2, na.rm = T)
-library(corrplot)
-corrplot(corr, method = 'color', na.label.col='black')
+detected_MP_proteins
+```
+
+
+```{r}
+missing_protein_df %>% filter(`gene name(s)` %in% detected_MP_proteins) %>% select(PE) %>% pull() %>% table()
+```
+
+
+
+# Additional results
+
+## Are the detected features gastric specific
+```{r}
+# misspelling in the original file name 
+primary_cell_nsaf <- read.csv('data/nasf/nasf_primary_cell_2.csv', row.names = 1)
+primary_cell_nsaf <- as.matrix(primary_cell_nsaf)
+# read annotation file
+IPAS_annotation <- read_csv('data/support-data/IPAS_annotation.csv')
+
+# only keep missing protein
+# primary_cell_nsaf <- primary_cell_nsaf[rownames(primary_cell_nsaf) %in% missing_proteins_accession,]
+
+primary_cell_nsaf_gene_symbol <- rownames_mapping(primary_cell_nsaf, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
+# use sum or average? ?? sum seems to make more sense
+temp <- as_tibble(primary_cell_nsaf_gene_symbol, rownames='symbol') %>%  filter(!is.na(symbol))  %>% group_by(symbol) %>% summarise_all(sum)
+primary_cell_nsaf_gene_symbol <- as.matrix(temp[-1])
+rownames(primary_cell_nsaf_gene_symbol) <- temp$symbol
+```
+```{r}
+primary_cell_nsaf['A0A087WTP8', 'IP0993_1701']
+gastric_nsaf['A0A087WTP8', 'IP0993_1701']
+```
+
+
+```{r}
+primary_cell_nsaf_gene_symbol['AGAP4',  'IP0993_1701']
+gastric_nsaf_gene_level['AGAP4', 'IP0993_1701']
+```
+
+
+```{r}
+primary_cell_nasf_gene_symbol <- primary_cell_nsaf_gene_symbol[!is.na(rownames(primary_cell_nsaf_gene_symbol)), ]
+```
+
+
+
+```{r}
+IPAS_gastric <- IPAS_annotation %>% filter(disease=='Gastric') %>% select(ipas) %>% pull()
+```
+
+
+```{r}
+create_annoataion <- function(data, annotation_table) {
+  annotation_tbl <- annotation_table %>% select(ipas, disease, subtype) %>% filter(ipas %in% colnames(data))
+  annotation_df <- data.frame(disease=annotation_tbl$disease, subtype=annotation_tbl$subtype)
+  rownames(annotation_df) <- annotation_tbl$ipas
+  return(annotation_df)
+}
+
+primary_cell_annotation <- create_annoataion(primary_cell_nasf_gene_symbol, annotation_table = IPAS_annotation)
+primary_cell_annotation$type <- paste(primary_cell_annotation$disease, primary_cell_annotation$subtype)
+primary_cell_annotation <- primary_cell_annotation['type']
+colnames(primary_cell_annotation) <- 'disease'
+table(primary_cell_annotation$disease)
+```
+
+
+
+```{r}
+extract_sample_id <- function(x, disease) {
+  rownames(x$annotation[x$annotation$disease %in% disease, ,drop=FALSE])
+}
+
+# diseases_keep <- c('Colon', 'Glioma', 'Leukemia', 'Lymphoblast', 'Melanoma', 'Neuroblastoma', 'Prostate', 'Ovarian')
+diseases_keep <- c("Leukemia ALL", "Leukemia AML", "Leukemia MDS", "Ovarian Ascites", "Gastric Ascites")
+
+
+SpC_list_primary_cell <- SpC_List(primary_cell_nasf_gene_symbol, annotation = primary_cell_annotation, proteins_filter=missing_proteins)
+
+replicates_for_keep <- extract_sample_id(SpC_list_primary_cell, diseases_keep)
+```
+
+```{r}
+# dat_primary_cell <- SpC_List(primary_cell_nasf_gene_symbol, annotation = primary_cell_annotation, replicates_keep = replicates_for_keep)
+# dat_primary_cell$matrix <- dat_primary_cell$matrix[rowSums(dat_primary_cell$matrix) > 0, ]
+```
+
+
+# create SpC_List object for each disease 
+```{r}
+IPAS <- mapply(FUN=extract_sample_id, disease=c("Leukemia ALL", "Leukemia AML", "Leukemia MDS", "Ovarian Ascites", "Gastric Ascites"), MoreArgs = list(x=SpC_list_primary_cell))
+SpC_lists <- mapply(FUN=SpC_List, replicates_keep=IPAS, MoreArgs = list(df=primary_cell_nasf_gene_symbol, annotation=primary_cell_annotation, proteins_filter=missing_proteins), SIMPLIFY = FALSE)
+```
+
+
+```{r}
+prefilter <- function(x) {
+  # N <- ncol(x$matrix)/2
+  N <- 2
+  keep <- rowSums(x$matrix > 0) >= N
+  return(rownames(x$matrix[keep,]))
+}
+```
+
+
+```{r}
+MPs <- lapply(SpC_lists, prefilter)
+sapply(MPs, length)
+```
+
+
+```{r}
+plot_venn_diagram(MPs)
+```
+
+
+```{r}
+VennDiagram::get.venn.partitions(MPs)
+```
+```{r}
+data.frame(data = names(MPs), number = matrix(MPs)) %>%
+  tidyr::unnest(cols = c(number)) %>%
+  dplyr::distinct(number, .keep_all = TRUE)
+```
+
+
+```{r}
+'RFPL2' %in% detected_MP_proteins
+'TBC1D28' %in% detected_MP_proteins
+'ZNF582' %in% detected_MP_proteins
+```
+
+
+
+# ```{r}
+# (all_nasf_gene_symbol[, IPAS_breast] > 0)
+# ```
+# 
+# ```{r}
+# gastric_nsaf_missing <- gastric_nsaf_gene_level[rownames(gastric_nsaf_gene_level) %in% missing_proteins, ]
+# 
+# N <- 1
+# keep <- rowSums(gastric_nsaf_missing > 0, na.rm = T) >= N
+# missing <- rownames(gastric_nsaf_missing[keep,])
+# ```
+
+
+```{r}
+mean(MPs$`Gastric Ascites` %in% detected_MP_proteins)
+mean(detected_MP_proteins %in% MPs$`Gastric Ascites`)
+```
+
+
+```{r}
+detected_MP_proteins[!(detected_MP_proteins %in% MPs$Gastric)]
+```
+
+
+# ```{r}
+# x <- SpC_lists$Gastric$matrix
+# x <- x[rowSums(x > 0) > 0, ]
+# ```
+
+```{r}
+SpC_lists$Gastric$annotation
+```
+
+
+```{r}
+colnames(gastric_nsaf) %in% rownames(SpC_lists$Gastric$annotation)
 ```
 

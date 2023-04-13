@@ -1,0 +1,34 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-03-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+dat <- read_csv('missing-protein-project/data/sample_experiment_metadata.csv', skip=1)
+```
+
+```{r}
+IPAS_in_RNA_Seq <- paste0(c('IPAS7103', 'IPAS0995', 'IPAS0982', 'IPAS0999', 'IPAS7100', 'IPAS0993', 'IPAS0981', 'IPAS7105'))
+```
+
+```{r}
+dat <- dat %>% filter(IPASx %in% IPAS_in_RNA_Seq)
+```
+
+
+```{r}
+write_csv(dat, 'missing-protein-project/output/eight_sample_information.csv')
+```
+

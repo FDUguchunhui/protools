@@ -6,6 +6,7 @@ date: "2022-10-11"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'missing-protein-project')
 ```
 
 
@@ -14,6 +15,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 ```
+
+
 
 
 # import raw data file
@@ -193,6 +196,19 @@ combine_isoforms <- function(mat) {
 # Approach 2
 # only keep canonical form (recommended by Jennifer) to avoid double-count
 ```{r}
+
+remove_isoforms <- function(mat) {
+  tbl <- mat %>% as_tibble(rownames = 'accession') %>% 
+    mutate('is_isoform'=str_detect(accession, pattern = '.+-.+')) %>% 
+    filter(is_isoform == FALSE) %>% 
+    select(-c('is_isoform'))
+  
+  out <- as.matrix(tbl[-1])
+  # need to use pull to make it as vector
+  rownames(out) <- pull(tbl[1])
+  return(out)
+}
+
 raw_count_mats_iso_removed <- lapply(raw_count_mats, remove_isoforms)
 ```
 
@@ -251,10 +267,10 @@ load('cache/dict_ensemble_to_symbol.rda')
 omics_metadata <- dict_ensembl_to_symbol %>% full_join(accession_metadata, by = c('hgnc_symbol'='gene')) %>% dplyr::select(-c(start_position, end_position)) %>% dplyr::select(accession, hgnc_symbol, ensembl_gene_id, gene_length, length)
 colnames(omics_metadata) <- c('accession_id', 'gene_symbol', 'ensembl_gene_id', 'gene_length', 'protein_length')
 head(omics_metadata)
-write_csv(omics_metadata, file = 'data/support data/omics_metadata.csv')
+write_csv(omics_metadata, file = 'data/support-data/omics_metadata.csv')
 
 
-omics_metadata <- read_csv('data/support data/omics_metadata.csv')
+omics_metadata <- read_csv('data/support-data/omics_metadata.csv')
 protein_length <- omics_metadata %>% dplyr::select(accession_id, protein_length) %>% unique() %>% na.omit()
 protein_length_df <- data.frame(length=protein_length$protein_length, row.names = protein_length$accession_id)
 save(protein_length_df, file = 'cache/protein_length.rda')
@@ -281,6 +297,7 @@ write_to_csv(nasf_mat$nuclear, 'data/cell line raw data/nasf_nuclear.csv')
 
 
 # only keep when count >= 2
+Should I filter count >=2 then calculate nsaf?
 ```{r}
 filter_greater_than_two <- function(count_mat) {
   count_mat[count_mat <= 1] <- 0
@@ -357,8 +374,8 @@ head(gastric_primary_cell_nsaf_mat)
 
 ## export data
 ```{r}
-write_to_csv(gastric_primary_cell_count_mat, 'data/gastric_primary_cell/gastric_primary_cell_count.csv')
-write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_primary_cell_nsaf.csv')
+write_to_csv(gastric_primary_cell_count_mat, 'data/gastric-primary-cell/gastric_primary_cell_count.csv')
+write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric-primary-cell/gastric_primary_cell_nsaf.csv')
 ```
 
 
@@ -370,6 +387,47 @@ gastric_primary_cell_nsaf_mat <- nsaf(gastric_primary_cell_count_mat, protein_le
 # fill those less than 2 spectral count read as 0 and filter proteins that are 0 for all samples
 gastric_primary_cell_nsaf_mat <- gastric_primary_cell_nsaf_mat[rowSums(gastric_primary_cell_nsaf_mat > 0) > 0, ]
 gastric_primary_cell_count_mat <- gastric_primary_cell_count_mat[rowSums(gastric_primary_cell_count_mat > 0) > 0, ]
-write_to_csv(gastric_primary_cell_count_mat, 'data/gastric_primary_cell/gastric_primary_cell_count_2.csv')
-write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric_primary_cell/gastric_primary_cell_nsaf_2.csv')
+write_to_csv(gastric_primary_cell_count_mat, 'data/gastric-primary-cell/gastric_primary_cell_count_2.csv')
+write_to_csv(gastric_primary_cell_nsaf_mat, 'data/gastric-primary-cell/gastric_primary_cell_nsaf_2.csv')
 ```
+
+
+
+
+```{r}
+metadata <- read_csv('data/sample_experiment_metadata.csv', skip = 1)
+metadata <- metadata %>% select(c('IPASx', 'Descriptionx', 'TypeSelect valueCell LinePrimary CellStem CellTissuex', 'OrganismSelect valueHumanHumanMouseMousex', 'DiseaseSelect valueBreastColonGastricGliomaLeukemiaLungLymphoblastMelanomaNeuroblastomaOvarianPancreaticProstatex',
+                      'SubTypeSelect valueALLAMLAdenoAscitiesBasalBrennerTumorCLLCMLCarcinomaControlExocrineAdenoGlioblastomaHER2LuminalA/BLungSmallCellMDSMesenchymalMetastaticNSCLCNormalPDACTNBCXenox',
+                      'MySQLx'))
+```
+
+
+```{r}
+colnames(metadata) <- c('IPAS', 'description', 'type', 'organism', 'disease', 'subtype', 'MySQL')
+```
+
+```{r}
+metadata_primary_cell <- metadata %>% filter(type == 'Primary Cell' & organism == 'Human' & MySQL == '1701') %>% select(IPAS, disease, subtype) %>% filter(!str_detect(IPAS, '_'))
+```
+
+
+
+```{r}
+IPAS_primary_cell <- paste0(str_replace(metadata_primary_cell$IPAS, 'IPAS', 'IP') , '_1701')
+primary_cell_count_mat <- generating_raw_count(IPAS = IPAS_primary_cell, count_column = 'tce_mscnt', keep_isoform=FALSE)
+```
+
+# only keep cell value with spectral count >=2
+```{r}
+primary_cell_count_mat[primary_cell_count_mat  <= 1] <- 0
+primary_cell_nsaf_mat <- nsaf(primary_cell_count_mat, protein_length_df, per_count = 10e6, na_fill=0)
+# remove row that are all 0
+primary_cell_nsaf_mat <- primary_cell_nsaf_mat[rowSums(primary_cell_nsaf_mat > 0) > 0, ]
+# head(primary_cell_nsaf_mat)
+```
+
+
+```{r}
+write.csv(as.data.frame(primary_cell_nsaf_mat, row.names = rownames(primary_cell_nsaf_mat)), 'data/nasf/nasf_primary_cell_2.csv')
+```
+

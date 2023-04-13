@@ -26,42 +26,10 @@ library(pheatmap)
 
 # Reading data
 ```{r}
-SpC <- read.delim("data/CellLineCompartment_TCE_SumTickNormalization.tsv", sep = '\t', skip=2, row.names = 'Accession')
+SpC <- read.csv('data/cell line raw data/tce_raw_count.csv', row.names = 1)
 # annotation <- read_tsv("data/CellLineCompartment_TCE_SumTickNormalization.tsv", n_max=3, col_select = c(-1), col_names = F, show_col_types = FALSE)
 ```
 
-## create column annotation
-```{r}
-disease_fulltype <- str_extract(colnames(SpC), '.+(?=\\.IP)')
-disease <- disease_fulltype
-disease[str_detect(disease_fulltype, 'Breast')] <- 'Breast'
-disease[str_detect(disease_fulltype, 'Leukemia')] <- 'Leukemia'
-IPAS_annotation <- data.frame(disease = disease, row.names = colnames(SpC))
-# should I use Pediatric GVHD as control?
-unique(disease)
-```
-
-
-## read-in newest missing protein list
-```{r}
-missing_protein_df <- readxl::read_xlsx('data/PE2-5.xlsx')
-missing_protein_df <- missing_protein_df[-c(1:12), ]
-head(missing_protein_df)
-```
-
-
-
-#===============================================================================
-# Analysis
-
-```{r}
-y <- SpC_List(SpC, IPAS_annotation, NA_substitution = 0, proteins_filter = missing_protein_df$Accession)
-```
-
-
-```{r}
-basic_describe(y)
-```
 
 
 # collapse 'Lymphoblast', 'Neuroblastoma', 'Prostate' since the group size is too small for reliable test 
@@ -110,7 +78,9 @@ unique_DEPs_TCE <- unique(unlist(lapply(res_lst, rownames)))
 
 # Heatmap for the entire data matrix
 ```{r}
-plot_heat_map(y, upper_limit = 5, row_keep = unique_DEPs, show_rownames = F, main='Cell Component Media')
+heatmap_dat$matrix <- y$matrix[, rownames(y$annotation)]
+heatmap_dat$annotation <- y$annotation
+plot_heat_map(heatmap_dat, upper_limit = 5, row_keep = unique_DEPs_TCE, show_rownames = F, main='Differentially expressed missing proteins in TCE')
 ```
 
 
@@ -119,19 +89,19 @@ plot_heat_map(y, upper_limit = 5, row_keep = unique_DEPs, show_rownames = F, mai
 
 # try use venn diagram to show uniquely missing DEPs in each dataset
 ```{r}
-library(VennDiagram)
-venn.diagram(
-  x = list('TCE'=unique_DEPs_TCE, 'exosome'=unique_DEPs_exosome, 'media'=unique_DEPs_media, 'nucleas'=unique_DEPs_nucleas),
-  filename = 'output/venn_diagramm.png',
-  output=T
-)
+# library(VennDiagram)
+# venn.diagram(
+#   x = list('TCE'=unique_DEPs_TCE, 'exosome'=unique_DEPs_exosome, 'media'=unique_DEPs_media, 'nucleas'=unique_DEPs_nucleas),
+#   filename = 'output/venn_diagramm.png',
+#   output=T
+# )
 ```
 
 
- Breast         Colon       Gastric        Glioma      Leukemia LungSmallCell   Lymphoblast      Melanoma Neuroblastoma         NSCLC       Ovarian 
-   39            10             9            10            15            27             2             7             2            60            15 
-   Pancreatic      Prostate 
-           29             5 
+   Breast         Colon       Gastric        Glioma      Leukemia     LungAdeno   Lymphoblast      Melanoma Neuroblastoma       Ovarian    Pancreatic 
+      39           10             9            10            14            60             2             5             2            14            18 
+     Prostate          SCLC 
+            5            27 
 ```{r}
 # if (!require(devtools)) install.packages("devtools")
 # devtools::install_github("yanlinlin82/ggvenn")
@@ -142,7 +112,7 @@ unique_proteins_subsets <- lapply(res_lst, rownames)
 # lapply(unique_proteins_subsets, length)
 
 ggvenn(
-  unique_proteins_subsets[c('NSCLC', 'Breast', 'Pancreatic', 'LungSmallCell')], 
+  unique_proteins_subsets[c('LungAdeno', 'Breast', 'Pancreatic', 'SCLC')], 
   fill_color = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF"),
   stroke_size = 0.5, set_name_size = 7
   )
