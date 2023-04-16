@@ -290,23 +290,23 @@ cor(full_table_detected_MP$NSAF, full_table_detected_MP$TPM, method = 'spearman'
 ```
 
 ```{r}
-library(ggrepel)
-
-MPs_scatterplot <- ggplot(full_table_detected_MP, aes(x=TPM, y=NSAF,  label=accession)) +
-  geom_point()
-MPs_scatterplot +
-  # geom_text_repel(data = subset(full_table_detected_MP, NSAF > 2 & TPM > 2)) +
-  geom_label_repel(data = subset(full_table_detected_MP, n > 2),
-                   aes(color=accession),
-                   ox.padding   = 0.35, 
-                  point.padding = 0.5,
-                  segment.color = 'grey50',
-                  direction     = "x",
-                  max.overlaps = 50, 
-                  force=30) +
-  
-    theme_classic() +
-  theme(legend.position="none")
+# library(ggrepel)
+# 
+# MPs_scatterplot <- ggplot(full_table_detected_MP, aes(x=TPM, y=NSAF,  label=accession)) +
+#   geom_point()
+# MPs_scatterplot +
+#   # geom_text_repel(data = subset(full_table_detected_MP, NSAF > 2 & TPM > 2)) +
+#   geom_label_repel(data = subset(full_table_detected_MP, n > 2),
+#                    aes(color=accession),
+#                    ox.padding   = 0.35, 
+#                   point.padding = 0.5,
+#                   segment.color = 'grey50',
+#                   direction     = "x",
+#                   max.overlaps = 50, 
+#                   force=30) +
+#   
+#     theme_classic() +
+#   theme(legend.position="none")
 ```
 
 
@@ -321,7 +321,7 @@ mapping_to_entrez <- function(gene_names) {
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 pathways_analysis_MP <- limma::goana(mapping_to_entrez(detected_MP_proteins$accession), plot=TRUE)
 
 expressed_regular_proteins <- combined_long %>% filter(!(IPAS %in% c('IP0981_1701', 'IP7103_1701'))) %>%  filter(!(accession %in% P2_5_proteins)) %>% filter(NSAF > 0) %>% arrange(accession) %>% group_by(accession) %>% summarise(n=n()) %>% filter(n >= 3)
@@ -333,34 +333,34 @@ write_csv(tibble(accession=all_expressed_proteins), 'data/expressed-protein-refe
 pathways_analysis_all <- limma::goana(mapping_to_entrez(all_expressed_proteins), plot=TRUE)
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 (topGOs_MP <- limma::topGO(pathways_analysis_MP, ontology = 'BP', number=20))
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 (topGOs_RP <- limma::topGO(pathways_analysis_RP, ontology = 'BP', number = 20))
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 intersect(topGOs_MP$Term, topGOs_RP$Term)
 ```
 
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 topGOs_all <- (limma::topGO(pathways_analysis_all, ontology = 'BP', number=20))
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 intersect(topGOs_RP$Term, topGOs_all$Term)
 ```
-```{r}
+```{r eval=FALSE, include=FALSE}
 topGOs_all$Term[!topGOs_all$Term %in% topGOs_RP$Term]
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 topGOs_MP$Term[!topGOs_MP$Term %in% topGOs_RP$Term]
 ```
 
@@ -380,6 +380,7 @@ combined_long %>% filter(accession == 'CTAGE1')
 ```{r}
 # the coverage rate of RNA product in protein product for missing protein
 (a <- summarize_by_case(combined_long, proteins_subset=missing_proteins, group_by_IPAS = TRUE, cases = c(1, 2)))
+write_csv(a, file='output/sample_MP_stats.csv')
 
 ## overall without removing the outlier
 (b <- summarize_by_case(combined_long, proteins_subset=missing_proteins, group_by_IPAS = FALSE, cases = c(1, 2)))
