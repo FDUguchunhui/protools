@@ -2,7 +2,8 @@
 % Please edit documentation in R/mapping.R
 \name{column_mapping}
 \alias{column_mapping}
-\title{Mapping values in a specific column of a \code{tibble} based on a dictionary (in form of tibble) and return the same}
+\title{mapping current entry ID in a \code{tibble} or \code{data.frame} column to another
+entry ID based on dictionary in form of \code{tibble} or \code{data.frame}}
 \usage{
 column_mapping(tbl, col, dictionary)
 }
@@ -14,7 +15,12 @@ column_mapping(tbl, col, dictionary)
 \item{dictionary}{a dictionary in form of \code{tibble}, the first column should be \code{key} and the second column should be \code{value}}
 }
 \description{
-A helper function to mapping values in a column of \code{tibble} based on a key-value dictionary simpler.
+Mapping values in a specific column (as keys) in a \code{tibble} or \code{data.frame} to another value based on a
+a given dictionary (in form of \code{tibble} or \code{data.frame}) and return the mapped values
+in the same order as in the keys
+}
+\details{
+A wrapper function to mapping values in a column of \code{tibble} based on a key-value dictionary simpler.
 }
 \examples{
 dictionary <- tibble::tibble(key=c('a', 'b', 'c'), value=c('A', 'B', 'C'))
@@ -23,5 +29,7 @@ column_mapping(A, 'letter', dictionary)
 
 }
 \seealso{
+mapping
+
 tibble: https://tibble.tidyverse.org/index.html
 }

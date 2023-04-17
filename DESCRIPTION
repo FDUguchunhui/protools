@@ -4,7 +4,7 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Chunhui", "Gu", email="chunhui.gu@uth.tmc.edu", role = c('aut', 'cre'))
 Description: a useful package for automating proteomics workflow for Dr. Samir M. Hanash's lab
-License: use_mit_license()
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.1
@@ -12,5 +12,8 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports: 
+    dplyr,
     lifecycle,
-    magrittr
+    magrittr,
+    rlang,
+    tibble

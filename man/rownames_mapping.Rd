@@ -2,14 +2,37 @@
 % Please edit documentation in R/mapping.R
 \name{rownames_mapping}
 \alias{rownames_mapping}
-\title{convert row names between different identification commonly used in Omics data}
+\title{convert rownames between different ID commonly used in Omics data
+
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
+This is a conceived "one-to-all" solution to map between different ID based on
+a single dictionary file. However, due to the complex cases of mapping between
+different ID system, such as one-to-many mappin, the mapping dictionary could be
+extremely complex when there are more than two ID systems.
+Please use with caution for when there are multiple-to-multiple mapping exist in the dictionary.
+This function is not recommended to use, and we recommend to create a clear binary
+mapping dictionary and then use protools::mapping instead}
 \usage{
 rownames_mapping(x, dictionary, map_from, map_to)
 }
 \arguments{
 \item{x}{a numeric matrix, cannot be a data.frame since duplicated row names are not allowed in data.frame}
+
+\item{dictionary}{a \code{tibble} or \code{data.frame} with columns as ID from different naming systems}
+
+\item{map_from}{a character for specifying which column to use as keys}
+
+\item{map_to}{a character for specifying which column to use as values}
 }
 \description{
+convert rownames between different ID commonly used in Omics data
+
 \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
-use with caution for when there are multiple-to-multiple mapping exist in the dictionary
+This is a conceived "one-to-all" solution to map between different ID based on
+a single dictionary file. However, due to the complex cases of mapping between
+different ID system, such as one-to-many mappin, the mapping dictionary could be
+extremely complex when there are more than two ID systems.
+Please use with caution for when there are multiple-to-multiple mapping exist in the dictionary.
+This function is not recommended to use, and we recommend to create a clear binary
+mapping dictionary and then use protools::mapping instead
 }
