@@ -6,7 +6,8 @@ date: "2022-09-21"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'missing-protein-project')
+knitr::opts_knit$set(root.dir = '/Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/data/missing-protein-project')
+getwd()
 ```
 
 
@@ -19,23 +20,38 @@ library('protools')
 ```
 
 
+# Import data
 ```{r}
+# import gastric primary cell nsaf data that filtered with Spectral count (SpC) >=2
 gastric_nsaf <- as.matrix(read.csv('data/gastric-primary-cell/gastric_primary_cell_nsaf_2.csv', row.names = 1))
+# # import gastric primary cell SpC data
 gastric_count <- read_csv('data/gastric-primary-cell/gastric_primary_cell_count.csv', show_col_types = FALSE)
+# rename the index column as "accession"
 colnames(gastric_count)[1] <- 'accession'
+# import information for mapping between accession, gene symbol, and ensembl ID
 omics_metadata <- read_csv('data/support-data/omics_metadata.csv', show_col_types = FALSE)
+# load missing protein information, it will load just one object missing_protein_df
 load('cache/missing_protein.rda')
 ```
-# create missing protein only use P2-4
-# the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
+# Create regular protein set and missing protein set
+create a character vector of missing protein accession only use P2-4 proteins from nextprot
+the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
 ```{r}
-# missing_protein_df <- missing_protein_df %>% filter(PE == 'Evidence at transcript level')
+# missing_proteins is a character vector of MP gene symbols
+# similar P2_5_proteins are protein gene symbols under P2-5 category in nextprot
+# P2_5_proteins will be used for negative filtering to get regular proteins
 missing_proteins <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(`gene name(s)`) %>% pull
 P2_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
 
+# missing_proteins is a character vector of MP accession ID
+# similar P2_5_proteins are protein accesion ID under P2-5 category in nextprot
 missing_proteins_accession <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(Accession) %>% pull
 P2_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
 ```
+
+
+
+
 
 # check the number of PSM for each proteins for missing and regular proteins
 ```{r}

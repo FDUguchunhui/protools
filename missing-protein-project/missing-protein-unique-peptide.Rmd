@@ -47,8 +47,6 @@ MP_204_products$IPAS <- paste0('IPAS', str_extract(MP_204_products$IPAS, '(?<=IP
 
 ```{r}
 unique_peptide_summary <- MP_final_peptide %>% filter(unique == 1) %>% group_by(Gene, Source) %>% summarise(n=n(), unique_peptide=paste0(peptide.seq, collapse = '+')) %>% arrange(Gene, desc(n), .by_group = FALSE) %>% ungroup()
-
-
 ```
 
 

@@ -49,6 +49,7 @@ combined <- inner_join(sample_demographic, MP_stats, by='IPAS')
 combined$per <- as.numeric(sub("%", "", combined$per))
 combined$`Tumor cell percentage in Ascites cells` <- as.numeric(sub("%", "", combined$`Tumor cell percentage in Ascites cells`))
 combined
+combined[match(target, combined$IPAS), ]
 ```
 
 
