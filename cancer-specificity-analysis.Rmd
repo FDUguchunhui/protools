@@ -1,0 +1,176 @@
+---
+title: "cancer-specificity-analysis"
+output: html_document
+date: "2023-04-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Additional results
+
+## Are the detected features gastric specific
+```{r}
+# misspelling in the original file name 
+primary_cell_nsaf <- read.csv('data/nasf/nasf_primary_cell_2.csv', row.names = 1)
+primary_cell_nsaf <- as.matrix(primary_cell_nsaf)
+# read annotation file
+IPAS_annotation <- read_csv('data/support-data/IPAS_annotation.csv')
+
+# only keep missing protein
+# primary_cell_nsaf <- primary_cell_nsaf[rownames(primary_cell_nsaf) %in% missing_proteins_accession,]
+
+primary_cell_nsaf_gene_symbol <- rownames_mapping(primary_cell_nsaf, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
+# use sum or average? ?? sum seems to make more sense
+temp <- as_tibble(primary_cell_nsaf_gene_symbol, rownames='symbol') %>%  filter(!is.na(symbol))  %>% group_by(symbol) %>% summarise_all(sum)
+primary_cell_nsaf_gene_symbol <- as.matrix(temp[-1])
+rownames(primary_cell_nsaf_gene_symbol) <- temp$symbol
+```
+
+
+
+```{r}
+primary_cell_nsaf['A0A087WTP8', 'IP0993_1701']
+gastric_nsaf['A0A087WTP8', 'IP0993_1701']
+```
+
+
+```{r}
+primary_cell_nsaf_gene_symbol['AGAP4',  'IP0993_1701']
+gastric_nsaf_gene_level['AGAP4', 'IP0993_1701']
+```
+
+
+```{r}
+primary_cell_nasf_gene_symbol <- primary_cell_nsaf_gene_symbol[!is.na(rownames(primary_cell_nsaf_gene_symbol)), ]
+```
+
+
+
+```{r}
+IPAS_gastric <- IPAS_annotation %>% filter(disease=='Gastric') %>% select(ipas) %>% pull()
+```
+
+
+```{r}
+create_annoataion <- function(data, annotation_table) {
+  annotation_tbl <- annotation_table %>% select(ipas, disease, subtype) %>% filter(ipas %in% colnames(data))
+  annotation_df <- data.frame(disease=annotation_tbl$disease, subtype=annotation_tbl$subtype)
+  rownames(annotation_df) <- annotation_tbl$ipas
+  return(annotation_df)
+}
+
+primary_cell_annotation <- create_annoataion(primary_cell_nasf_gene_symbol, annotation_table = IPAS_annotation)
+primary_cell_annotation$type <- paste(primary_cell_annotation$disease, primary_cell_annotation$subtype)
+primary_cell_annotation <- primary_cell_annotation['type']
+colnames(primary_cell_annotation) <- 'disease'
+table(primary_cell_annotation$disease)
+```
+
+
+
+```{r}
+extract_sample_id <- function(x, disease) {
+  rownames(x$annotation[x$annotation$disease %in% disease, ,drop=FALSE])
+}
+
+# diseases_keep <- c('Colon', 'Glioma', 'Leukemia', 'Lymphoblast', 'Melanoma', 'Neuroblastoma', 'Prostate', 'Ovarian')
+diseases_keep <- c("Leukemia ALL", "Leukemia AML", "Leukemia MDS", "Ovarian Ascites", "Gastric Ascites")
+
+
+SpC_list_primary_cell <- SpC_List(primary_cell_nasf_gene_symbol, annotation = primary_cell_annotation, proteins_filter=missing_proteins)
+
+replicates_for_keep <- extract_sample_id(SpC_list_primary_cell, diseases_keep)
+```
+
+```{r}
+# dat_primary_cell <- SpC_List(primary_cell_nasf_gene_symbol, annotation = primary_cell_annotation, replicates_keep = replicates_for_keep)
+# dat_primary_cell$matrix <- dat_primary_cell$matrix[rowSums(dat_primary_cell$matrix) > 0, ]
+```
+
+
+# create SpC_List object for each disease 
+```{r}
+IPAS <- mapply(FUN=extract_sample_id, disease=c("Leukemia ALL", "Leukemia AML", "Leukemia MDS", "Ovarian Ascites", "Gastric Ascites"), MoreArgs = list(x=SpC_list_primary_cell))
+SpC_lists <- mapply(FUN=SpC_List, replicates_keep=IPAS, MoreArgs = list(df=primary_cell_nasf_gene_symbol, annotation=primary_cell_annotation, proteins_filter=missing_proteins), SIMPLIFY = FALSE)
+```
+
+
+```{r}
+prefilter <- function(x) {
+  # N <- ncol(x$matrix)/2
+  N <- 2
+  keep <- rowSums(x$matrix > 0) >= N
+  return(rownames(x$matrix[keep,]))
+}
+```
+
+
+```{r}
+MPs <- lapply(SpC_lists, prefilter)
+sapply(MPs, length)
+```
+
+
+```{r}
+plot_venn_diagram(MPs)
+```
+
+
+```{r}
+VennDiagram::get.venn.partitions(MPs)
+```
+```{r}
+data.frame(data = names(MPs), number = matrix(MPs)) %>%
+  tidyr::unnest(cols = c(number)) %>%
+  dplyr::distinct(number, .keep_all = TRUE)
+```
+
+
+```{r}
+'RFPL2' %in% detected_MP_proteins
+'TBC1D28' %in% detected_MP_proteins
+'ZNF582' %in% detected_MP_proteins
+```
+
+
+
+# ```{r}
+# (all_nasf_gene_symbol[, IPAS_breast] > 0)
+# ```
+# 
+# ```{r}
+# gastric_nsaf_missing <- gastric_nsaf_gene_level[rownames(gastric_nsaf_gene_level) %in% missing_proteins, ]
+# 
+# N <- 1
+# keep <- rowSums(gastric_nsaf_missing > 0, na.rm = T) >= N
+# missing <- rownames(gastric_nsaf_missing[keep,])
+# ```
+
+
+```{r}
+mean(MPs$`Gastric Ascites` %in% detected_MP_proteins)
+mean(detected_MP_proteins %in% MPs$`Gastric Ascites`)
+```
+
+
+```{r}
+detected_MP_proteins[!(detected_MP_proteins %in% MPs$Gastric)]
+```
+
+
+# ```{r}
+# x <- SpC_lists$Gastric$matrix
+# x <- x[rowSums(x > 0) > 0, ]
+# ```
+
+```{r}
+SpC_lists$Gastric$annotation
+```
+
+
+```{r}
+colnames(gastric_nsaf) %in% rownames(SpC_lists$Gastric$annotation)
+```
