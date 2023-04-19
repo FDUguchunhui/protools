@@ -81,7 +81,6 @@ column_mapping <- function(tbl, col, dictionary) {
 #' @param dictionary a `tibble` or `data.frame` with columns as ID from different naming systems
 #' @param map_from a character for specifying which column to use as keys
 #' @param map_to a character for specifying which column to use as values
-#' @export
 rownames_mapping <- function(x, dictionary, map_from, map_to) {
   # dictionary <- dplyr::as.tibble(dictionary)
   # dictionary <- dictionary %>% dplyr::select(map_from, map_to) %>% 

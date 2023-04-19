@@ -7,6 +7,7 @@ date: "2022-09-21"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = '/Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/data/missing-protein-project')
+setwd('/Users/cgu3/Library/CloudStorage/OneDrive-InsideMDAnderson/data/missing-protein-project')
 getwd()
 ```
 
@@ -16,7 +17,7 @@ library(tidyverse)
 # install.packages("devtools")
 if (!require("protools", quietly = TRUE))
    devtools::install_github("https://github.com/FDUguchunhui/protools")
-library('protools')
+# library('protools')
 ```
 
 
@@ -51,62 +52,13 @@ P2_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
 
 
 
-
-
-# check the number of PSM for each proteins for missing and regular proteins
-```{r}
-MP_counts <- gastric_count %>% filter(accession %in% missing_proteins_accession)
-MP_counts_long <- MP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
-
-
-RP_counts <-  gastric_count %>% filter(!(accession %in% P2_5_proteins_accession))
-RP_counts_long <- RP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
-```
-
-
-```{r}
-MP_counts_long %>% ggplot(aes(x=count)) + 
-  geom_histogram()
-
-MP_counts_long %>% ggplot(aes(x=count)) + 
-  geom_histogram(breaks=seq(1, 10, 1)) +
-   scale_x_continuous(breaks = seq(1, 10, 1), lim = c(1, 10)) +
-  theme_classic()
-
-RP_counts_long %>% ggplot(aes(x=count)) + 
-  geom_histogram(breaks=seq(1, 300, 1))
-RP_counts_long %>% ggplot(aes(x=count)) + 
-  geom_histogram(breaks=seq(1, 10, 1)) +
-   scale_x_continuous(breaks = seq(1, 10, 1), lim = c(1, 10)) +
-  theme_classic()
-```
-
-
-```{r}
-
-```
-
-
-
-
-
-
-
-# create missing protein only use P2-4
-# the regular protein is not the just a complementary of missing protein, need to filter P1-5 proteins
-```{r}
-# missing_protein_df <- missing_protein_df %>% filter(PE == 'Evidence at transcript level')
-missing_proteins <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(`gene name(s)`) %>% pull
-P2_5_proteins <- missing_protein_df  %>% select(`gene name(s)`) %>% pull
-
-missing_proteins_accession <- missing_protein_df %>% filter(PE != 'Uncertain') %>% select(Accession) %>% pull
-P2_5_proteins_accession <- missing_protein_df %>% select(Accession) %>% pull
-```
-
-# check the number of PSM for each proteins for missing and regular proteins
+# check the number of SpC for each protein for both missing and regular proteins
 ```{r}
 # IP0981_1701 IP0982_1701 IP0993_1701 IP0995_1701 IP0999_1701 IP7100_1701 IP7103_1701 IP7105_1701 sample 1-8
+# rename sample to Sample1-8
 colnames(gastric_count) <- c('accession', paste('Sample', 1:8, sep = ' '))
+
+# create long format used for barplot
 MP_counts <- gastric_count %>% filter(accession %in% missing_proteins_accession)
 MP_counts_long <- MP_counts %>% pivot_longer(names_to = 'IPAS', values_to = 'count', cols = c(-accession)) %>% filter(count > 0)
 MP_counts_long$type <- 'Missing'
@@ -118,8 +70,10 @@ RP_counts_long$type <- 'Regular'
 all_counts_long <- rbind(MP_counts_long, RP_counts_long)
 ```
 
-
+# Figure S4 The peptide-spectral-matching (PSM) count distribution for regular proteins (Left blue) and missing proteins (Right red)
+Frequency of Spectral count for regular proteins
 ```{r}
+# collapse SpC >= 50 into one single category "50+"
 RP_barplot_data <-  RP_counts_long %>% mutate(count_discrete=ifelse(count >= 50, '50+', count))
 RP_barplot_data$count_discrete <- factor(RP_barplot_data$count_discrete, levels=c(as.character(1:49), '50+'))
 RP_barplot_data %>% 
@@ -153,31 +107,77 @@ theme_bw() +
 
 
 
+
+
+
+# Aggregate proteins expression into gene-level
+The oirginal proteomics data is in accession level and the original transcription data
+is in gene level. To match the two data, we need to aggregate protein expression at
+the gene level. Typically, one gene can be transcripted and translated into multiple proteins and 
+a protein can be translated only from a single gene. So the mapping from accession to gene symbol is unique.
+After mapping, there can be rows with the same gene symbol ID, then those row with the 
+same gene symbol ID were summed into a single row to represent the expression of proteins translated 
+from that one gene.
+
+## create a dictionary used for mapping ensembl_gene_id to gene symbol
+When a same ensembl_gene_id can be map to multiple gene symbol (not common)
+use only the first one (ordered by alphabeta)
 ```{r}
-omics_metadata %>% filter(!(accession_id %in% P2_5_proteins_accession)) %>% summarise(avg_length=mean(protein_length, na.rm=TRUE))
-omics_metadata %>% filter(accession_id %in% missing_proteins_accession) %>% summarise(avg_length=mean(protein_length, na.rm=TRUE))
+dict_accession_to_gene_symbol <- omics_metadata %>% dplyr::select(accession_id, gene_symbol) %>% unique() %>% filter(!is.na(accession_id))
 ```
 
-
-
-# aggregate into gene-level
+## Aggregate proteins into gene-level by summing rows with the same row indices
 ```{r}
-# accession_gene_symbol <- data.frame(gene_symbol = accession_metadata$gene,row.names = accession_metadata$accession)
-# rownames(gastric_nsaf) <- accession_gene_symbol[rownames(gastric_nsaf),]
-gastric_nsaf_gene_level <- rownames_mapping(gastric_nsaf, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
+gastric_nsaf_gene_level <- gastric_nsaf
+rownames(gastric_nsaf_gene_level) <- mapping(rownames(gastric_nsaf), dict_accession_to_gene_symbol)
+
+# gastric_nsaf_gene_level <- rownames_mapping(gastric_nsaf, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
 # use sum or average? ?? sum seems to make more sense
 temp <- as_tibble(gastric_nsaf_gene_level, rownames='symbol') %>%  filter(!is.na(symbol))  %>% group_by(symbol) %>% summarise_all(sum)
 gastric_nsaf_gene_level <- as.matrix(temp[-1])
 rownames(gastric_nsaf_gene_level) <- temp$symbol
+
+# remove rows with NA index
+gastric_nsaf_gene_level <- gastric_nsaf_gene_level[!is.na(rownames(gastric_nsaf_gene_level)), ]
 
 head(gastric_nsaf_gene_level)
 nrow(gastric_nsaf_gene_level)
 ```
 
 
+# Transform RNA expression data into gene symbol level
+The original RNA data is indexed by ensembl_gene_id (ENSG), to used it with
+proteomics data at gene symbol level, we need to mapping ensembl_gene_id to
+gene symbol.
+
+# load transcription data
+! avoid use load in future
 ```{r}
+#
 load('cache/count_TPM.rda')
-count_TPM_gene_symbol <- rownames_mapping(count_TPM_mat, omics_metadata, map_from = 'ensembl_gene_id', map_to = 'gene_symbol')
+```
+
+
+## create a dictionary used for mapping ensembl_gene_id to gene symbol
+When a same ensembl_gene_id can be map to multiple gene symbol (not common)
+use only the first one (ordered by alphabeta)
+```{r}
+dict_ensembl_to_gen_symbol <- omics_metadata %>% select(ensembl_gene_id, gene_symbol) %>% unique()
+dict_ensembl_to_gen_symbol <- dict_ensembl_to_gen_symbol %>% dplyr::group_by(ensembl_gene_id) %>% 
+      dplyr::arrange(gene_symbol) %>% 
+      dplyr::summarise(map_to=first(gene_symbol))
+```
+
+### mapping ensembl_gene_id to gene symbol and pre-process data
+1. Remove row with 0 in all cells
+2. Only keep the 8 gastric primary cell samples
+3. aggregate row with the same index by summing across row axis
+```{r}
+count_TPM_gene_symbol <- count_TPM_mat
+rownames(count_TPM_gene_symbol) <- mapping(rownames(count_TPM_mat), dictionary = dict_ensembl_to_gen_symbol)
+# count_TPM_gene_symbol
+
+# count_TPM_gene_symbol <- rownames_mapping(count_TPM_mat, omics_metadata, map_from = 'ensembl_gene_id', map_to = 'gene_symbol') # deprecated
 count_TPM_gene_symbol <- count_TPM_gene_symbol[rowSums(count_TPM_gene_symbol > 0) > 0, ]
 
 temp <- as_tibble(count_TPM_gene_symbol, rownames='symbol') %>% filter(!is.na(symbol)) %>% group_by(symbol) %>% summarise_all(sum)
@@ -187,10 +187,14 @@ rownames(count_TPM_gene_symbol) <- temp$symbol
 colnames(count_TPM_gene_symbol) <- c('IP7103_1701', 'IP0972_1701', 'IP0995_1701', 'IP0982_1701', 'IP0999_1701', 'IP7100_1701', 'IP0993_1701', 'IP0981_1701', 'IP7105_1701')
 count_TPM_gene_symbol <- count_TPM_gene_symbol[, colnames(gastric_nsaf_gene_level)]
 
+# remove row with NA index
+count_TPM_gene_symbol <- count_TPM_gene_symbol[!is.na(rownames(count_TPM_gene_symbol)), ]
+
 head(count_TPM_gene_symbol)
 nrow(count_TPM_gene_symbol)
-write.csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary_cell.csv')
+# write.csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary_cell.csv')
 ```
+
 
 # rename to sample 1- 8
 ```{r}
@@ -199,10 +203,7 @@ write.csv(as.data.frame(count_TPM_gene_symbol), file='TPM_gastric_cancer_primary
 ```
 
 
-```{r}
-count_TPM_gene_symbol <- count_TPM_gene_symbol[!is.na(rownames(count_TPM_gene_symbol)), ]
-gastric_nsaf_gene_level <- gastric_nsaf_gene_level[!is.na(rownames(gastric_nsaf_gene_level)), ]
-```
+
 
 # check the overall covarage of RNA and protein for each other
 ```{r}
@@ -212,14 +213,20 @@ mean(rownames(count_TPM_gene_symbol) %in% rownames(gastric_nsaf_gene_level))
 mean(rownames(gastric_nsaf_gene_level) %in% rownames(count_TPM_gene_symbol))
 ```
 
-# combine the RNA and protein data into long format
+
+# 
+## combine and match RNA and proteomics data into long format
+Each row is a protein identified by gene symbol and sample ID primary key: (accession, IPAS) in term of SQL
+TPM is the RNA expression of the gene that coding those proteins
+NSAF is the combined protein expressions for proteomics translated from that gene
 ```{r}
 A <- as_tibble(log(count_TPM_gene_symbol+1), rownames='accession') %>% pivot_longer(names_to = 'IPAS', values_to = 'TPM', cols = c(-accession))
 B <- as_tibble(log(gastric_nsaf_gene_level+1), rownames='accession') %>% pivot_longer(names_to = 'IPAS', values_to = 'NSAF', cols = c(-accession))
 combined_long <- full_join(A, B, by=c('accession', 'IPAS')) %>% replace(is.na(.), 0) %>% filter(!(TPM == 0 & NSAF == 0))
+head(combined_long)
 ```
 
-
+## Create a helper function for calculate the number of proteins-at-gene-level has non-zero RNA expression
 ```{r}
 #' @title calculate proportion of protein products supported with RNA products
 #' @description It product the proportion of each condition based on different settings
@@ -298,7 +305,6 @@ left_join(full_table_detected_MP, MP_counts_long, by = c('accession', 'IPAS'))
 # MP_count_mat_gene_level <- rownames_mapping(MP_count_mat, omics_metadata, map_from = 'accession_id', map_to = 'gene_symbol')
 
 write_csv(full_table_detected_MP, 'output/protein list/detected_104_MP_products_with_RNA.csv')
-
 ```
 
 ```{r}
@@ -396,7 +402,7 @@ combined_long %>% filter(accession == 'CTAGE1')
 ```{r}
 # the coverage rate of RNA product in protein product for missing protein
 (a <- summarize_by_case(combined_long, proteins_subset=missing_proteins, group_by_IPAS = TRUE, cases = c(1, 2)))
-write_csv(a, file='output/sample_MP_stats.csv')
+# write_csv(a, file='output/sample_MP_stats.csv')
 
 ## overall without removing the outlier
 (b <- summarize_by_case(combined_long, proteins_subset=missing_proteins, group_by_IPAS = FALSE, cases = c(1, 2)))
