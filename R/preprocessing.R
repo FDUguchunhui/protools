@@ -1,5 +1,4 @@
 
-#' @export
 #' @title SpC list constructor
 #' @description Create SpC_list object for conviently conducting downstream analysis
 #' @param df a data.frame with proteins accession number as row names, replicate (sample) identifier as column names, with
@@ -19,12 +18,6 @@
 #'   \item annotation - the original annotation passed into the function after removing rownames in replicates_remove 
 #' }
 
-
-#' @example 
-#' 
-#' 
-#' 
-#' 
 
 SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL, replicates_remove=NULL, replicates_keep=NULL) {
   SpC_matrix <- as.matrix(df)
@@ -76,9 +69,8 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
 
 
 
-#' @export
-#' @title 
-#' @description 
+#' @title Calculate transcription per million (TPM)
+#' @description Calculate transcription per million (TPM) based on given information
 #' @param x a matrix of raw counts with a gene id in as row name
 #' @param length a data.frame that contains information about gene length for 
 #' @param per_count 
@@ -87,8 +79,8 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
 #' each gene represented by the gene id in each row 
 #' @return the TPM normalized matrix in the same shape as x
 #' @references 
-#' # https://www.youtube.com/watch?v=TTUrtCY2k-w&t=548s
-#  https://www.biostars.org/p/335187/
+#' https://www.youtube.com/watch?v=TTUrtCY2k-w&t=548s
+#'  https://www.biostars.org/p/335187/
 TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
   if(!is.null(na_fill)) {
     x[is.na(x)] = na_fill
@@ -102,7 +94,6 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 
 
 
-#' @export
 #' @title Calculate Normalized Spectral Abundance Factor (NASF)
 #' @description NSAF_j = (Sc_j/len)/sum(Sc_i/len for all proteins)
 #' @param x a matrix of raw counts

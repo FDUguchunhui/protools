@@ -1,14 +1,14 @@
-#' @export
+
 #' @title Plot heatmap for SpC_list object with customized setting
 #' @description This is an wrapper function that use pheatmap to plot heatmap
 #' for the SpC_list object and provide additional data processing and plotting setting that
 #' is useful for proteomics spectral count data
-#' @param x
-#' @param upper_limit
-#' @param log_scale
-#' @param row_keep
-#' @param show_rownames 
-#' @param show_colnames, show_colnames, cluster_cols, cluster_rows, ... pheatmap
+#' @param x x
+#' @param upper_limit x
+#' @param log_scale x
+#' @param row_keep x
+#' @param show_rownames x
+#' @param show_colnames show_colnames, cluster_cols, cluster_rows, ... pheatmap
 #' parameters that will be used when calling pheatmap function
 
 
@@ -83,7 +83,6 @@ basic_describe <- function(x, boxplot_main='Distribution', piechart_main='Group'
 }
 
 
-#' @export
 #' @title Custumorized Venn diagram plot
 #' @description This is wrapper function for VennDiagram::venn.diagram function
 #' with a preset of parameters. It will output to R viewer instead of as a file
@@ -129,7 +128,6 @@ plot_venn_diagram <- function(lists, main='Venn diagram', ...) {
 
 
 
-#' @export
 #' @title Custumorized Venn diagram plot
 #' @description This is wrapper function for VennDiagram::venn.diagram function
 #' with a preset of parameters. It will output to R viewer instead of as a file
@@ -145,9 +143,8 @@ plot_venn_diagram_top_Go <- function(top_GOs, main='Title', ...) {
 
 
 
-#' @export
 #' @title Plot bubble plot for enrichment analysis results 
-#' @description 
+#' @description x
 #' @param data result 
 #' 
 bubble_plot <- function(data, title=NULL) {

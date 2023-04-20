@@ -45,7 +45,7 @@ mapping <- function(keys, dictionary, na.rm=TRUE) {
 #' @param col a string, the name of the column that whose values will be mapped based a dictionary
 #' @param dictionary a dictionary in form of `tibble`, the first column should be `key` and the second column should be `value`
 #'
-#' @return
+#' @return a string vectors that contains new IDs after mapping
 #' @export
 #'
 #' @examples
@@ -65,9 +65,8 @@ column_mapping <- function(tbl, col, dictionary) {
 
 
 #' @title convert rownames between different ID commonly used in Omics data
-#' 
 #' `r lifecycle::badge("experimental")`
-#' This is a conceived "one-to-all" solution to map between different ID based on
+#' @description  This is a conceived "one-to-all" solution to map between different ID based on
 #' a single dictionary file. However, due to the complex cases of mapping between
 #' different ID system, such as one-to-many mappin, the mapping dictionary could be
 #' extremely complex when there are more than two ID systems.
@@ -120,9 +119,9 @@ rownames_mapping <- function(x, dictionary, map_from, map_to) {
 
 
 #' @export
-#' Remove protein isoforms that have a name suffix.
+#' @title Remove protein isoforms that have a name suffix.
 #' 
-#' For example, protein `P08181-1` is an isoform of protein `P08181`.
+#' @description  example, protein `P08181-1` is an isoform of protein `P08181`.
 #' Be aware that not all isoforms are expressed with a suffix that consists of 
 #' hyphen and number: https://www.uniprot.org/help/canonical_and_isoforms.
 #' 

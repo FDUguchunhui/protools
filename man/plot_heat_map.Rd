@@ -17,9 +17,17 @@ plot_heat_map(
 )
 }
 \arguments{
-\item{show_rownames}{}
+\item{x}{x}
 
-\item{show_colnames, }{show_colnames, cluster_cols, cluster_rows, ... pheatmap
+\item{upper_limit}{x}
+
+\item{log_scale}{x}
+
+\item{row_keep}{x}
+
+\item{show_rownames}{x}
+
+\item{show_colnames}{show_colnames, cluster_cols, cluster_rows, ... pheatmap
 parameters that will be used when calling pheatmap function}
 }
 \description{

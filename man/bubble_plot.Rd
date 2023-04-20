@@ -10,5 +10,5 @@ bubble_plot(data, title = NULL)
 \item{data}{result}
 }
 \description{
-Plot bubble plot for enrichment analysis results
+x
 }

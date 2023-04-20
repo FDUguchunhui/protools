@@ -1,8 +1,6 @@
-#' protools
-#'
-#' integrated package for proteomics data pre-processing and analysis
-#'
-#'
-#'
-#'
+#' @keywords internal
+"_PACKAGE"
+
+## usethis namespace: start
+## usethis namespace: end
 NULL

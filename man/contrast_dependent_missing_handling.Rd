@@ -12,6 +12,20 @@ contrast_dependent_missing_handling(
   min_num_valids
 )
 }
+\arguments{
+\item{X}{x}
+
+\item{col_annotation}{x}
+
+\item{condition1}{x}
+
+\item{condition2}{x}
+
+\item{min_num_valids}{x}
+}
+\value{
+x
+}
 \description{
 create data matrix based on conditions to compared and number of valid values per condition
 }

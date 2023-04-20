@@ -240,3 +240,4 @@ fabric.properties
 ##############sub-project files###############################
 missing-protein-project/
 PPI-for-protein-detection/
+inst/doc

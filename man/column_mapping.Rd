@@ -14,6 +14,9 @@ column_mapping(tbl, col, dictionary)
 
 \item{dictionary}{a dictionary in form of \code{tibble}, the first column should be \code{key} and the second column should be \code{value}}
 }
+\value{
+a string vectors that contains new IDs after mapping
+}
 \description{
 Mapping values in a specific column (as keys) in a \code{tibble} or \code{data.frame} to another value based on a
 a given dictionary (in form of \code{tibble} or \code{data.frame}) and return the mapped values

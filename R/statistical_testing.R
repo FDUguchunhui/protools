@@ -1,5 +1,4 @@
 #' Create table of differentially expressed tags using nonparametric method
-#' @export
 #' @description Perform non-parametric test for sequencing data
 #' 
 #' @param x a object of SpC_list class created by SpC_list function
@@ -29,8 +28,6 @@
 #'   \item PValue - p-value calculated based on selected statistical method
 #'   \item PAdjusted - adjusted p-value using BH method
 #' }
-#' 
-#' @example 
 #' @author Chunhui Gu
 #' @references Ming Li (2010), Comparative Shotgun Proteomics Using Spectral Count Data and Quasi-Likelihood Modeling
 nonpar_test <- function(x, case, method=c('fisher', 'Wilcoxon'), treat_zero_as_missing=TRUE) {
@@ -126,7 +123,6 @@ nonpar_test <- function(x, case, method=c('fisher', 'Wilcoxon'), treat_zero_as_m
 
 
 #' Table of the Top Differentially Expressed tags
-#' @export
 #' 
 #' @description filter the top differentially expressed tags based on adjustment p-value
 #' and fold-change
@@ -145,7 +141,6 @@ topTable <- function(res, logFC, PAjusted) {
 
 
 
-#' @export
 #' @title One-versus-all test
 #' @description this function perform a series of one-versus-all tests with respect to every category in
 #' the y$annotation$disease
@@ -181,12 +176,12 @@ one_vs_all_test <- function(x,  method = c('fisher', 'Wilcoxon'), logFC = 1, PAj
 
 #' create data matrix based on conditions to compared and number of valid values per condition
 #' 
-#' @param X
-#' @param col_annotation
-#' @param condition1
-#' @param condition2
-#' @param min_num_valids
-#' @return
+#' @param X x
+#' @param col_annotation x
+#' @param condition1 x
+#' @param condition2 x
+#' @param min_num_valids x
+#' @return x
 contrast_dependent_missing_handling <- function(X, col_annotation, condition1, condition2, min_num_valids) {
   col_conditions <- col_annotation[colnames(X), ]
   newX <- X[ , col_conditions == 'Breast' | col_conditions == 'Leukemia']
