@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/reference/test_package.html#special-files
 
 library(testthat)
-library(project)
+library(protools)
 
-test_check("project")
+test_check("protools")
