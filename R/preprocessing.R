@@ -1,4 +1,3 @@
-
 #' @title SpC list constructor
 #' @description Create SpC_list object for conviently conducting downstream analysis
 #' @param df a data.frame with proteins accession number as row names, replicate (sample) identifier as column names, with
@@ -17,6 +16,7 @@
 #'   \item matrix - the data matrix that is converted from the dataframe df using provided parameters
 #'   \item annotation - the original annotation passed into the function after removing rownames in replicates_remove 
 #' }
+#' @export
 
 
 SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL, replicates_remove=NULL, replicates_keep=NULL) {
@@ -106,6 +106,7 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 #' McIlwain S, Mathews M, Bereman MS, Rubel EW, MacCoss MJ, Noble WS. 
 #' Estimating relative abundances of proteins from shotgun proteomics data. 
 #' BMC Bioinformatics. 2012 Nov 19;13:308. doi: 10.1186/1471-2105-13-308. PMID: 23164367; PMCID: PMC3599300.
+#' @export
 nsaf <- function(x, protein_length, per_count, na_fill=NULL) {
   # reorder the gene id and gene length information as the same in x
   TPM(x, protein_length, per_count = per_count, na_fill = na_fill)
