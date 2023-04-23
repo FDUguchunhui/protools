@@ -81,6 +81,7 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
 #' @references 
 #' https://www.youtube.com/watch?v=TTUrtCY2k-w&t=548s
 #'  https://www.biostars.org/p/335187/
+#' @export
 TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
   if(!is.null(na_fill)) {
     x[is.na(x)] = na_fill
