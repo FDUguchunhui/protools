@@ -18,6 +18,7 @@ Imports:
     dplyr,
     lifecycle,
     magrittr,
+    pheatmap,
     rlang (>= 0.4.11),
     tibble
 VignetteBuilder: knitr

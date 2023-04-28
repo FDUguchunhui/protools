@@ -1,7 +1,7 @@
-
-#' @title Plot heatmap for SpC_list object with customized setting
-#' @description This is an wrapper function that use pheatmap to plot heatmap
-#' for the SpC_list object and provide additional data processing and plotting setting that
+#' @export
+#' @title Plot heatmap using SpC_List object with customized setting
+#' @description This is an wrapper function that use pheatmap::pheatmap to plot heatmap
+#' for the SpC_List object and provide additional data processing and plotting setting that
 #' is useful for proteomics spectral count data
 #' @param x x
 #' @param upper_limit x
@@ -51,7 +51,7 @@ plot_heat_map <- function(x,
                      show_colnames = show_colnames,
                      cluster_cols =  cluster_cols,
                      cluster_rows = cluster_rows,
-                     annotation_col=y$annotation,
+                     annotation_col=x$annotation,
                      ...)
   
 } 

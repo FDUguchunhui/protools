@@ -2,7 +2,7 @@
 % Please edit documentation in R/visulization.R
 \name{plot_heat_map}
 \alias{plot_heat_map}
-\title{Plot heatmap for SpC_list object with customized setting}
+\title{Plot heatmap using SpC_List object with customized setting}
 \usage{
 plot_heat_map(
   x,
@@ -31,7 +31,7 @@ plot_heat_map(
 parameters that will be used when calling pheatmap function}
 }
 \description{
-This is an wrapper function that use pheatmap to plot heatmap
-for the SpC_list object and provide additional data processing and plotting setting that
+This is an wrapper function that use pheatmap::pheatmap to plot heatmap
+for the SpC_List object and provide additional data processing and plotting setting that
 is useful for proteomics spectral count data
 }
