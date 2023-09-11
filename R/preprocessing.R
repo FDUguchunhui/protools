@@ -70,25 +70,51 @@ SpC_List <- function(df, annotation, NA_substitution=NULL, proteins_filter=NULL,
 
 
 #' @title Calculate transcription per million (TPM)
-#' @description Calculate transcription per million (TPM) based on given information
-#' @param x a matrix of raw counts with a gene id in as row name
-#' @param length a data.frame that contains information about gene length for 
+#' @description
+#' `r lifecycle::badge("stable")`
+#'Calculate transcription per million (TPM) based on given information
+#' @param x a matrix of raw counts with a gene ID in as rowname
+#' @param length a data.frame that contains information about protein length
+#' where the first column as the protein ID and the second colmun as the length
 #' @param per_count 
-#' @param na_fill the values used to fill if NA is encountered. Can be a scalar
-#' for all NA or a vector which values will be sequentially filled into NA positions
-#' each gene represented by the gene id in each row 
+#' @param na_fill the values used to fill if NA is encountered. Should be a scalar
+#' each gene represented by the gene ID in each row 
 #' @return the TPM normalized matrix in the same shape as x
+#' @export
 #' @references 
 #' https://www.youtube.com/watch?v=TTUrtCY2k-w&t=548s
 #'  https://www.biostars.org/p/335187/
-#' @export
-TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
+#'  
+#' @example
+#' count <-  matrix(
+#'   c(10, 12, 30,
+#'     20, 25, 60,
+#'     5, 8, 15,
+#'     0, 0, 1),
+#'   nrow = 4,
+#'   byrow = T,
+#'   dimnames = list(c('A', 'B', 'C', 'D'), c('Rep1', 'Rep2', 'Rep3'))
+#' )
+#' 
+#' gene_length <- data.frame(ID=c('D', 'C', 'B', 'A'), length=c(10, 1, 4, 2))
+#' 
+#' transcript_per_million_norm(count, gene_length=gene_length, per_count = 10)
+#'
+#' 
+#' 
+
+transcript_per_million_norm <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
   if(!is.null(na_fill)) {
     x[is.na(x)] = na_fill
   }
-  # reorder the gene id and gene length information as the same in x
-  len <-  gene_length[rownames(x), ]
-  x <- sweep(x, 1, len, FUN = '/')
+  # reorder the gene ID and gene length information as the same in x
+  protein_length <-  mapping(rownames(x), gene_length)
+  # check if any protein in the matrix does have length information
+  if (any(is.na(protein_length))) {
+    print(rownames(x)[is.na(protein_length)])
+    stop('Not all protein have a corresponding length information in "length" file')
+  }
+  x <- sweep(x, 1, protein_length, FUN = '/')
   # divide cells in each row by the corresponding total RPK of the replicate it belongs to
   return(t(t(x) * per_count/colSums(x)))
 }
@@ -96,7 +122,12 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 
 
 #' @title Calculate Normalized Spectral Abundance Factor (NASF)
-#' @description NSAF_j = (Sc_j/len)/sum(Sc_i/len for all proteins)
+#' @description 
+#' `r lifecycle::badge("stable")`
+#' \deqn{
+#' NSAF_j = \frac{SpC_j/proteinLength_j}{denominator} \\
+#' denomiator = \sum{over all protein i} SpC_i/proteinLength_i
+#' }
 #' @param x a matrix of raw counts
 #' @param protein_length a data.frame that contains information about protein length for 
 #' each protein represented by protein id in each row 
@@ -110,10 +141,41 @@ TPM <- function(x, gene_length, per_count=10e6, na_fill=NULL) {
 #' @export
 nsaf <- function(x, protein_length, per_count, na_fill=NULL) {
   # reorder the gene id and gene length information as the same in x
-  TPM(x, protein_length, per_count = per_count, na_fill = na_fill)
+  transcript_per_million_norm(x, protein_length, per_count = per_count, na_fill = na_fill)
 }
 
 
 
 
 
+#' Title Total spectral count normalization
+#' 
+#' `r lifecycle::badge("stable")`
+#' The total spectral count (TSC) normalization involve three steps:
+#' 1. Calculate the total number of spectra in each BioSample
+#' 2. Calculate the average number of spectra across all BioSamples
+#' 3. Multiply each spectrum count in each sample by the average count over the BioSample's total spectrum count
+#'
+#' @param x a matrix of raw counts with a element ID in as rowname
+#'
+#' @return a matrix of total spectral count normalized version of original input
+#' @export
+#'
+#' @examples 
+#' count <- matrix(
+#'   c(12, 8,
+#'     6, 3,
+#'     4, 3),
+#'   nrow = 3,
+#'   byrow = T,
+#'   dimnames = list(c('A', 'B', 'C'), c('Rep1', 'Rep2'))
+#' )
+#' total_spectral_count_norm(count)
+#' 
+#' @references https://support.proteomesoftware.com/hc/en-us/articles/
+#' 115002739586-Spectrum-Count-Normalization-in-Scaffold#:~:text=The%
+#' 20normalization%20process%20involves%20three,the%20BioSample's%20total%20spectrum%20count
+total_spectral_count_norm <- function(x) {
+  col_sum <- colSums(x)
+  return(sweep(x, 2, mean(col_sum)/col_sum, FUN = '*'))
+}

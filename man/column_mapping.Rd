@@ -2,8 +2,8 @@
 % Please edit documentation in R/mapping.R
 \name{column_mapping}
 \alias{column_mapping}
-\title{mapping current entry ID in a \code{tibble} or \code{data.frame} column to another
-entry ID based on dictionary in form of \code{tibble} or \code{data.frame}}
+\title{mapping current entry ID in a \code{tibble} column to another
+entry ID based on dictionary in form of \code{tibble}}
 \usage{
 column_mapping(tbl, col, dictionary)
 }
@@ -33,6 +33,4 @@ column_mapping(A, 'letter', dictionary)
 }
 \seealso{
 mapping
-
-tibble: https://tibble.tidyverse.org/index.html
 }

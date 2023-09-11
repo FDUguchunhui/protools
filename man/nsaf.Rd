@@ -16,7 +16,11 @@ each protein represented by protein id in each row}
 the NASF normalized matrix in the same shape as x
 }
 \description{
-NSAF_j = (Sc_j/len)/sum(Sc_i/len for all proteins)
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#stable}{\figure{lifecycle-stable.svg}{options: alt='[Stable]'}}}{\strong{[Stable]}}
+\deqn{
+NSAF_j = \frac{SpC_j/proteinLength_j}{denominator} \\
+denomiator = \sum{over all protein i} SpC_i/proteinLength_i
+}
 }
 \references{
 https://github.com/moldach/proteomics-spectralCount-normalization/blob/master/nsaf.R

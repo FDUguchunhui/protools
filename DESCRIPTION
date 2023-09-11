@@ -7,7 +7,7 @@ Description: a useful package for automating proteomics workflow for Dr. Samir M
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
 Suggests: 
     knitr,
     rmarkdown,

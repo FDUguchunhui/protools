@@ -16,7 +16,10 @@ non-isoform entries.}
 \description{
 example, protein \code{P08181-1} is an isoform of protein \code{P08181}.
 Be aware that not all isoforms are expressed with a suffix that consists of
-hyphen and number: https://www.uniprot.org/help/canonical_and_isoforms.
+hyphen and number: https://www.uniprot.org/help/canonical_and_isoforms. The function
+may not work as you expect: when a isoform of a protein is the only protein detected
+
+#' \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
 }
 \examples{
 # when use `method='remove'`

@@ -11,29 +11,30 @@
 #' dictionary <- tibble::tibble(key=c('a', 'b', 'c'), value=c('A', 'B', 'C'))
 #' keys <- c('a', 'a', 'c', 'b')
 #' mapping(keys, dictionary)
-#' @seealso 
-#' tibble: https://tibble.tidyverse.org/index.html
 #' @export
 mapping <- function(keys, dictionary, na.rm=TRUE) {
-  if(!tibble::is_tibble(dictionary)) {
-    stop('the dictionary used is not a tibble')
-  }
-  
-  
-  
+
   # check whether key-value pair are uniquely defined
   # [[ return a vector while [ return a tibble
   dictionary_keys <- dictionary[[1]]
   if (any(duplicated(dictionary_keys))) {
     stop('Non-unique keys in dictionary: the same key can be mapped to multiple values')
   }
-  values <- dictionary[match(keys, dictionary_keys), ][[2]]
+  
+  colnames_dictionary <- names(dictionary)
+  
+  keys <- data.frame(key=keys)
+  
+  values <- keys %>%
+    dplyr::left_join(dictionary, by = c('key' = colnames_dictionary[1])) %>%
+    dplyr::select(colnames_dictionary[2]) %>%
+    dplyr::pull()
   return(values)
 }
 
 
-#' mapping current entry ID in a `tibble` or `data.frame` column to another 
-#' entry ID based on dictionary in form of `tibble` or `data.frame`
+#' mapping current entry ID in a `tibble` column to another 
+#' entry ID based on dictionary in form of `tibble`
 #' 
 #' Mapping values in a specific column (as keys) in a `tibble` or `data.frame` to another value based on a
 #' a given dictionary (in form of `tibble` or `data.frame`) and return the mapped values
@@ -55,9 +56,9 @@ mapping <- function(keys, dictionary, na.rm=TRUE) {
 #' 
 #' @seealso 
 #' mapping
-#' 
-#' tibble: https://tibble.tidyverse.org/index.html
+
 column_mapping <- function(tbl, col, dictionary) {
+
   values <- mapping(tbl[[{col}]], dictionary)
   tbl[[{col}]] <- values
   return(tbl)
@@ -123,8 +124,11 @@ rownames_mapping <- function(x, dictionary, map_from, map_to) {
 #' 
 #' @description  example, protein `P08181-1` is an isoform of protein `P08181`.
 #' Be aware that not all isoforms are expressed with a suffix that consists of 
-#' hyphen and number: https://www.uniprot.org/help/canonical_and_isoforms.
+#' hyphen and number: https://www.uniprot.org/help/canonical_and_isoforms. The function
+#' may not work as you expect: when a isoform of a protein is the only protein detected
+# it will still be removed after this function.
 #' 
+#' #' `r lifecycle::badge("experimental")`
 #' @param x a numeric matrix, with each row represents a protein and each column represents a sample
 #' @param method how data is processed in the processing of removing isoforms.
 #' Use `remove` if you want just discard isoform data. Use `combine` to sum data of isoform into
@@ -134,7 +138,7 @@ rownames_mapping <- function(x, dictionary, map_from, map_to) {
 #' dat <- data.frame(a=c(1, 2, 3, 4, 5), b=c(1, 2, 3, 4, 5), row.names = c('P1001', 'P1001-1', 'P1002', 'P1002-2', 'P1003'))
 #' mat <- as.matrix(dat)
 #' remove_isoform_with_suffix(mat, method='remove')
-#' 
+#'
 #' # When use `method='combine'`
 #' remove_isoform_with_suffix(mat, method='combine')
 #' @seealso https://www.uniprot.org/help/canonical_and_isoforms
@@ -145,7 +149,7 @@ remove_isoform_with_suffix <- function(x, method=c('remove', 'combine')) {
     tbl <- tbl %>% 
       dplyr::mutate('is_isoform'=stringr::str_detect(accession, pattern = '.+-.+')) %>% 
       dplyr::filter(is_isoform == FALSE) %>% 
-      dplyr::select(-c('is_isoform')) 
+      dplyr::select(-c('is_isoform'))
   } else {
     tbl <- tbl %>% dplyr::mutate(accession=stringr::str_extract(accession, pattern='.+(?=-[0-9]+)')) %>% 
       dplyr::group_by(accession) %>% dplyr::summarise(across(.cols=everything(), .fns=sum))

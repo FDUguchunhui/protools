@@ -24,6 +24,3 @@ dictionary <- tibble::tibble(key=c('a', 'b', 'c'), value=c('A', 'B', 'C'))
 keys <- c('a', 'a', 'c', 'b')
 mapping(keys, dictionary)
 }
-\seealso{
-tibble: https://tibble.tidyverse.org/index.html
-}
